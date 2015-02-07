@@ -69,26 +69,6 @@ on("chat:message", function(msg) {
 
 var Parser = function() {
     this.keyword = ['armor class', 'hit points', 'speed', 'str', 'dex', 'con', 'int', 'wis', 'cha', 'saving throws', 'skills', 'damage resistance', 'damage immunities', 'condition immunities','damage vulnerabilities','senses', 'languages', 'challenge', 'traits', 'actions','legendary actions', 'bio'];
-    this.skills = {
-        acrobatics: 'dexterity', 
-        "animal handling": 'wisdom', 
-        arcana: 'intelligence', 
-        athletics: 'strength', 
-        deception: 'charisma',
-        history: 'intelligence',
-        insigth: 'wisdom',
-        intimidation: 'charisma',
-        investigation: 'intelligence',
-        medecine: 'wisdom',
-        nature: 'intelligence',
-        perception: 'wisdom',
-        performance: 'charisma',
-        persuation: 'charisma',
-        religion: 'intelligence',
-        "sleight of Hand": 'dexterity',
-        stealth: 'dexterity',
-        survival: 'wisdom'
-    }
     this.statblock = '';
     this.npc = undefined;
 
@@ -123,6 +103,7 @@ var Parser = function() {
                     this.parseSavingThrow(section[key]); break;
                 case 'skills':
                     this.parseSkills(section[key]); break;
+                
                 case 'damage resistance':
                 case 'damage immunities':
                 case 'condition immunities':
@@ -133,12 +114,7 @@ var Parser = function() {
                     var value = section[key].substring(key.length+1);
                     this.setAttribut(this.npc.id, attr, value);
                     break;
-                case 'traits':
-                    this.parseTraits(section[key]); 
-                    break;
-                case 'actions':
-                    this.parseActions(section[key]); 
-                    break;
+                
                 case 'title': 
                     break;
                 
@@ -353,11 +329,14 @@ var Parser = function() {
     }
     
     this.parseSkills = function(input){
+
+        var skills = {acrobatics: 'dexterity', "animal handling": 'wisdom', arcana: 'intelligence', athletics: 'strength', deception: 'charisma',history: 'intelligence',insigth: 'wisdom',intimidation: 'charisma',investigation: 'intelligence',medecine: 'wisdom',nature: 'intelligence',perception: 'wisdom',performance: 'charisma',persuation: 'charisma',religion: 'intelligence',"sleight of Hand": 'dexterity', stealth: 'dexterity', survival: 'wisdom'};
+
         input = input.replace(/Skills\s+/i, '');
         var regex = /(\w+).*?(\d+)/gi;
         while(match = regex.exec(input)){
             var skill = match[1].toLowerCase();
-            var abilitymod = this.skills[skill];
+            var abilitymod = skills[skill];
             var attr = 'npc_' + skill.replace(' ','') + '_bonus';
             var tmp = Math.floor((getAttrByName(this.npc.id,'npc_'+ abilitymod)-10)/2);
             //log(abilitymod + " = " + tmp);
