@@ -12,27 +12,6 @@ function capitalizeEachWord(str) {
     });
 }
 
-function sortString(data){
-    // temporary holder of position and sort-value
-    var map = data.map(function(e, i) {
-        return { index: i, value: e.toLowerCase() };
-    })
-    // sorting the map containing the reduced values
-    map.sort(function(a, b) {
-        return +(a.value > b.value) || +(a.value === b.value) - 1;
-    });
-    // container for the resulting order
-    var result = map.map(function(e){
-      return data[e.index];
-    });
-    return result;
-}
-
-if (typeof String.prototype.endsWith !== 'function') {
-    String.prototype.endsWith = function(suffix) {
-        return this.indexOf(suffix, this.length - suffix.length) !== -1;
-    };
-}
 
 on("chat:message", function(msg) {
     // Exit if not an api command
