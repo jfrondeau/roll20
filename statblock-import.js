@@ -45,35 +45,22 @@ on("chat:message", function(msg) {
     log("================");
 });
 
-function splitRegex(source, regex, map)
+function splitRegex(source, regex)
 {
-    var precedentKey;
+    var precedentKey = 'debut';
     var precedentIndex = 0;
     var debut = 0;
     var section = {};
 
     while(match = regex.exec(source))
     {
-        if(match.index > 0 && precedentKey != undefined)
-        {
-            if(map)
-                section[precedentKey] = map(source.substring(precedentIndex + precedentKey.length + 2, match.index).trim());    
-            else
-                section[precedentKey] = source.substring(precedentIndex + precedentKey.length + 2, match.index).trim();
-        }
-            
+        section[precedentKey] = source.substring(debut, match.index).trim();
         precedentKey = match[1].toLowerCase();
-        precedentIndex = match.index;
-
-        if(debut == 0 ) {
-            debut = precedentIndex;
-            section.debut = match.index;
-        }
+        debut = match.index + precedentKey.length + 2;
     }    
-    section[precedentKey] = source.substring(precedentIndex + precedentKey.length + 2).trim();
+    section[precedentKey] = source.substring(debut).trim();
     return section;
 }
-
 
 var Parser = function() {
     this.keyword = ['armor class', 'hit points', 'speed', 'str', 'dex', 'con', 'int', 'wis', 'cha', 'saving throws', 'skills', 'damage resistance', 'damage immunities', 'condition immunities','damage vulnerabilities','senses', 'languages', 'challenge', 'traits', 'actions','legendary actions', 'bio'];
@@ -85,6 +72,8 @@ var Parser = function() {
         
         this.statblock = this.clean(statblock);
         this.section = this.splitSection(this.statblock);
+
+        //log(this.section);
 
         this.createCharacter();
 
@@ -110,17 +99,17 @@ var Parser = function() {
             this.parseActions();
 
         if('damage immunities' in this.section)
-            this.setAttribut(this.npc.id, 'damage immunity', this.section['damage immunities']);
+            this.setAttribut(this.npc.id, 'npc_damage_immunity', this.section['damage immunities']);
         if('condition immunities' in this.section)
-            this.setAttribut(this.npc.id, 'condition immunity', this.section['condition immunities']);
+            this.setAttribut(this.npc.id, 'npc_condition_immunity', this.section['condition immunities']);
         if('damage vulnerabilities' in this.section)
-            this.setAttribut(this.npc.id, 'damage vulnerability', this.section['damage vulnerabilities']);
+            this.setAttribut(this.npc.id, 'npc_damage_vulnerability', this.section['damage vulnerabilities']);
         if('senses' in this.section)
-            this.setAttribut(this.npc.id, 'senses', this.section['senses']);
+            this.setAttribut(this.npc.id, 'npc_senses', this.section['senses']);
         if('languages' in this.section)
-            this.setAttribut(this.npc.id, 'languages', this.section['languages']);
+            this.setAttribut(this.npc.id, 'npc_languages', this.section['languages']);
         if('damage resistances' in this.section)
-            this.setAttribut(this.npc.id, 'damage resistance', this.section['damage resistances']);
+            this.setAttribut(this.npc.id, 'npc_damage_resistance', this.section['damage resistances']);
     }
 
     this.clean = function(text) {
@@ -137,7 +126,9 @@ var Parser = function() {
             "%3B": ";",
             "%3D": "=",
             "%3E": "",
-            "%3F": "?"
+            "%3F": "?",
+            "%u2019" : "'",
+            "%u2013" : "-"
         };
         var re = new RegExp(Object.keys(map).join("|"), "g");
         text = text.replace(re, function(matched) {
@@ -158,7 +149,7 @@ var Parser = function() {
 
         // Cherche l'index du début du trait
         var match = statblock.match(/#(?!armor class|hit points|speed|str|dex|con|int|wis|cha|saving throws|skills|damage resistances|damage immunities|condition immunities|damage vulnerabilities|senses|languages|challenge|traits|actions|legendary actions|bio)((?:[A-Z][a-z]+[0-9-\s(\/)]{0,5})+)\./i);
-        var posTraits = match.index;
+        
         if(match !== null)
         {
             attributes = statblock.substring(0, match.index);
@@ -167,14 +158,16 @@ var Parser = function() {
 
         // Split les attributs du statblock;
         var regex = /#\s*(armor class|hit points|speed|str|dex|con|int|wis|cha|saving throws|skills|damage resistances|damage immunities|condition immunities|damage vulnerabilities|senses|languages|challenge)(?:\s|#)/gmi;
-        var section = splitRegex(attributes, regex, function(texte){
-            return texte.replace(/\.#/g,'.\n').replace(/#/g,' ');  
-        });
+        var section = splitRegex(attributes, regex);
 
-        // Traite title, size and abilities
+        _.each(section, function(value, key){
+            section[key] = value.replace(/\.#/g,'.\n').replace(/#/g,' ');
+        });
+      
+        //  title, size and abilities
         var pos = statblock.indexOf('#');
-        section['title'] =  statblock.substring(0, pos);
-        section['size'] = statblock.substring(pos+1, section.debut);
+        section['title'] =  section['debut'].substring(0, pos);
+        section['size'] = section['debut'].substring(pos+1);
         
         var abilitiesName = ['str', 'dex', 'con', 'int', 'wis', 'cha'];
         var abilities = '';
@@ -186,13 +179,15 @@ var Parser = function() {
         }
         section['abilities'] = abilities;
 
-        // Traite le reste du statblock
+
+        // reste du statblock
         var section2 = splitRegex(powers, /#\s*(actions|legendary actions|bio)(?:\s|#)/gmi);
-        section2['traits'] = powers.substring(0, section2.debut);
+        section2['traits'] = section2['debut'];
+        delete section2['debut'];
         
         for (var attrname in section2) { section[attrname] = section2[attrname]; } // Combine le tout.
-        delete section.debut;
-
+        
+        //log(section);
         return section;
     }
 
@@ -213,7 +208,7 @@ var Parser = function() {
             log("Character will be updated");
         }
 
-        obj.set({gmnotes: this.statblock.replace(/#/g , '\n')});
+        obj.set({gmnotes: this.statblock.replace(/#/g , '<br />')});
         this.npc = obj;
         this.setAttribut(obj.id, 'is_npc', 1);
     }
@@ -247,11 +242,6 @@ var Parser = function() {
             });
             //log('Attribut ' + name + " updated to " + currentVal);
         }
-    }
-
-    this.parseSimple = function(sectionName, attrName){
-        var attr = 'npc_' + attrName.replace(' ', '_').replace('ties', 'ty');                    
-        this.setAttribut(this.npc.id, attr, section[attrName]);
     }
 
     this.parseArmorClass = function() {
@@ -346,68 +336,59 @@ var Parser = function() {
     this.parseTraits = function(){
         //var traits = this.parsePower(this.section['traits']);
 
-        var traits = splitRegex(this.section['traits'], /#((?:[A-Z][a-z]+[0-9-\s(\/)]{0,5})+)\./g, function(texte){
-            return texte.replace(/\.#/g,'.\n').replace(/#/g,' ');
-        });
-        
         var texte = "";
+
+        var traits = splitRegex(this.section['traits'], /#((?:[A-Z][a-z]+[0-9-\s(\/)]{0,5})+)\./g);
         _.each(traits, function(value, key){
-            texte += capitalizeEachWord(key) + ': ' + value + '\n';
+            if(value  != '')
+                texte += capitalizeEachWord(key) + ': ' + value.replace(/\.#/g,'.\n').replace(/#/g,' ') + '\n';
         });
+
         texte = texte.slice(0, -1);
 
         // Add legendary action to traits
         if('legendary actions' in this.section)
         {
-            var legendary = splitRegex(this.section['legendary actions'], /#((?:[A-Z][a-z]+[0-9-\s(\/)]{0,5})+)\./g, function(texte){
-                return texte.replace(/\.#/g,'.\n').replace(/#/g,' ');
-            });
-
-            texte += '\n\nLegendary Actions\n';
-            texte += this.section['legendary actions'].substring(0, legendary.debut).replace(/\.#/g,'.\n').replace(/#/g,' ') + '\n';
+            var legendary = splitRegex(this.section['legendary actions'], /#((?:[A-Z][a-z]+[0-9-\s(\/)]{0,5})+)\./g);
+            texte += '\n\nLegendary Actions\n' + legendary.debut.replace(/\.#/g,'.\n').replace(/#/g,' ') + '\n';
             delete legendary.debut;
+
             _.each(legendary, function(value, key){
-                texte += capitalizeEachWord(key) + ': ' + value + '\n';
+            if(value  != '')
+                texte += capitalizeEachWord(key) + ': ' + value.replace(/#/g,' ') + '\n';
             });
             texte = texte.slice(0, -1);        
         }
-
         this.setAttribut(this.npc.id, 'npc_traits', texte);
     }
     
     this.parseActions = function(){
-        
-        var actions = this.parsePower(this.section['actions']);
+
+        this.section['actions'] = '#' + this.section['actions'];
+        var actions = splitRegex(this.section['actions'], /#((?:[A-Z][a-z]+[0-9-\s(\/)]{0,5})+)\./g);
         var cpt = 1;
-        
-         _.each(actions, function(value, key){
-            this.setAttribut(this.npc.id, 'npc_action_name' + cpt, key);
+
+        _.each(actions, function(value, key){
+            if(value  == '') return;
+
+            if(key == 'multiattack') {
+                this.setAttribut(this.npc.id, 'npc_multiattack', value.replace(/\.#/g,'.\n').replace(/#/g,' '));
+                return;
+            }
+
+            this.setAttribut(this.npc.id, 'npc_action_name' + cpt, capitalizeEachWord(key));
             var pos = value.indexOf('Hit:');
-            this.setAttribut(this.npc.id, 'npc_action_description' + cpt, value.substring(0, pos).trim());
-            this.setAttribut(this.npc.id, 'npc_action_effect' + cpt, value.substring(pos).trim());
+            if(pos != -1) {
+                this.setAttribut(this.npc.id, 'npc_action_description' + cpt, value.substring(0, pos).replace(/\.#/g,'.\n').replace(/#/g,' '));
+                this.setAttribut(this.npc.id, 'npc_action_effect' + cpt, value.substring(pos).replace(/\.#/g,'.\n').replace(/#/g,' '));
+            }
+            else {
+                this.setAttribut(this.npc.id, 'npc_action_description' + cpt, value.replace(/\.#/g,'.\n').replace(/#/g,' '));
+            }
+            
             cpt++;
         }, this);
-    }
-    
-    this.parsePower = function(input){
-        //log(input);
-        
-        var power = {};
-        var regex = /#((?:[A-Z][a-z]+[0-9-\s(\/)]{0,5})+)\./g;
-        var precedentKey;
-        var precedentIndex = 0;
-        while(match = regex.exec(input)){
-            if(match.index > 0 && precedentKey != undefined){
-                power[precedentKey] = input.substring(precedentIndex + precedentKey.length + 2, match.index -1).replace(/\.#/g,'.\n').replace(/#/g,' ').trim();
-            }
-                
-            precedentKey = match[1];
-            precedentIndex = match.index;
-        }    
-        power[precedentKey] = input.substring(precedentIndex + precedentKey.length + 2).replace(/\.#/g,'.\n').replace(/#/g,' ').trim();
-        
-        return power;
-    }
+    }    
 };
 
 
