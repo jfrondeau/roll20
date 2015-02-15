@@ -1,0 +1,13 @@
+{
+  "name": "statblock-import-5e",
+  "version": "1",
+  "description": "This script parse the content of a token GM note to create 5e monster character sheet.",
+  "authors": "Jean-Francois Rondeau",
+  "roll20userid": "250162",
+  "dependencies": [],
+  "modifies": {
+  	"token": "read",
+    "gmnotes": "read",
+  },
+  "conflicts": []
+}
