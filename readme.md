@@ -2,7 +2,8 @@ D&D 5e Statblock to Roll20.net character
 
 This script parse the content of a token GM note to create 5e monster character sheet.
 
-Usage: Write !build-monster in chat.
+Usage: copy statblock from PDF to a token gmnotes.
+Write !build-monster in chat and press enter!.
 
 The script read the statblock from the current selected token to create a monster character sheet. If the monster already exist, it will be updated.
 RULE:

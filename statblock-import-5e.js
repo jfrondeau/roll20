@@ -19,22 +19,20 @@ on("chat:message", function(msg) {
         return;
     }
 
-    msg.who = msg.who.replace(" (GM)", "");
-    //msg.content = msg.content.replace("(GM) ", "");
     var command = msg.content.split(" ", 1);
 
     if (command != "!build-monster") {
-        sendChat('GM', "Commande " + command + " invalide");
         return;
     }
+    
     if (!msg.selected) {
-        sendChat("GM", "Vous devez selectionner un token");
+        sendChat("GM", "No token selected");
         return;
     }
 
     var token = getObj("graphic", msg.selected[0]._id);
     if (token.get("subtype") != 'token') {
-        sendChat('GM', "Pas un token");
+        sendChat("GM", "No token selected");
         return;
     }
 
@@ -216,8 +214,10 @@ var Parser = function() {
         }
 
         obj.set({gmnotes: this.statblock.replace(/#/g , '<br />')});
-        if('bio' in this.section)
-            obj.set({bio: this.section.bio.replace(/#/g , '<br />')});
+        if('bio' in this.section && this.section.bio != undefined) {
+            log(this.section.bio);
+            //obj.set({bio: this.section.bio.replace(/#/g , '<br />')});
+        }
 
         this.npc = obj;
         this.setAttribut(obj.id, 'is_npc', 1);
@@ -430,4 +430,4 @@ statblock = "Test%20BUGBEAR%3Cbr%3EMedium%20humanoid%20%28goblinoid%29%2C%20chao
 statblock = "Adult%20Red%20Dragon%3Cbr%3EHuge%20dragon%2C%20chaotic%20evil%3Cbr%3EArmor%20Class%2019%20%28natural%20armor%29%3Cbr%3EHit%20Points%20256%20%2819d12%20+%20133%29%3Cbr%3ESpeed%2040%20ft.%2C%20climb%2040%20ft.%2C%20fly%2080%20ft.%3Cbr%3E%20%20STR%20%20DEX%20%20CON%20%20INT%20%20WIS%20%20CHA%3Cbr%3E%20%2027%20%28+8%29%20%2010%20%28+0%29%20%2025%20%28+7%29%20%2016%20%28+3%29%20%2013%20%28+1%29%20%2021%20%28+5%29%3Cbr%3ESaving%20Throws%20Dex%20+6%2C%20Con%20+13%2C%20Wis%20+7%2C%20Cha%20+11%3Cbr%3ESkills%20Perception%20+13%2C%20Stealth%20+6%3Cbr%3EDamage%20Immunities%20fire%3Cbr%3ESenses%20blindsight%2060%20ft.%2C%20darkvision%20120%20ft.%2C%20passive%20Perception%2023%3Cbr%3ELanguages%20Common%2C%20Draconic%3Cbr%3EChallenge%2017%20%2818%2C000%20XP%29%3Cbr%3ELegendary%20Resistance%20%283/Day%29.%20If%20the%20dragon%20fails%20a%20saving%20%3Cbr%3Ethrow%2C%20it%20can%20choose%20to%20succeed%20instead.%3Cbr%3EActions%3Cbr%3EMultiattack.%20The%20dragon%20can%20use%20its%20Frightful%20Presence.%20It%20then%20%3Cbr%3Emakes%20three%20attacks%3A%20one%20with%20its%20bite%20and%20two%20with%20its%20claws.%3Cbr%3EBite.%20Melee%20Weapon%20Attack%3A%20+14%20to%20hit%2C%20reach%2010%20ft.%2C%20one%20target.%20%3Cbr%3EHit%3A%2019%20%282d10%20+%208%29%20piercing%20damage%20plus%207%20%282d6%29%20fire%20damage.%3Cbr%3EClaw.%20Melee%20Weapon%20Attack%3A%20+14%20to%20hit%2C%20reach%205%20ft.%2C%20one%20target.%20%3Cbr%3EHit%3A%2015%20%282d6%20+%208%29%20slashing%20damage.%3Cbr%3ETail.%20Melee%20Weapon%20Attack%3A%20+14%20to%20hit%2C%20reach%2015%20ft.%2C%20one%20target.%20%3Cbr%3EHit%3A%2017%20%282d8%20+%208%29%20bludgeoning%20damage.%3Cbr%3EFrightful%20Presence.%20Each%20creature%20of%20the%20dragon%u2019s%20choice%20that%20%3Cbr%3Eis%20within%20120%20feet%20of%20the%20dragon%20and%20aware%20of%20it%20must%20succeed%20%3Cbr%3Eon%20a%20DC%2019%20Wisdom%20saving%20throw%20or%20become%20frightened%20for%201%20%3Cbr%3Eminute.%20A%20creature%20can%20repeat%20the%20saving%20throw%20at%20the%20end%20of%20%3Cbr%3Eeach%20of%20its%20turns%2C%20ending%20the%20effect%20on%20itself%20on%20a%20success.%20If%20a%20%3Cbr%3Ecreature%u2019s%20saving%20throw%20is%20successful%20or%20the%20effect%20ends%20for%20it%2C%20%3Cbr%3Ethe%20creature%20is%20immune%20to%20the%20dragon%u2019s%20Frightful%20Presence%20for%20%3Cbr%3Ethe%20next%2024%20hours.%3Cbr%3EFire%20Breath%20%28Recharge%205%u20136%29.%20The%20dragon%20exhales%20fire%20in%20a%2060-foot%20%3Cbr%3Econe.%20Each%20creature%20in%20that%20area%20must%20make%20a%20DC%2021%20Dexterity%20%3Cbr%3Esaving%20throw%2C%20taking%2063%20%2818d6%29%20fire%20damage%20on%20a%20failed%20save%2C%20or%20%3Cbr%3Ehalf%20as%20much%20damage%20on%20a%20successful%20one.%3Cbr%3ELegendary%20Actions%3Cbr%3EThe%20dragon%20can%20take%203%20legendary%20actions%2C%20choosing%20from%20the%20%3Cbr%3Eoptions%20below.%20Only%20one%20legendary%20action%20option%20can%20be%20used%20%3Cbr%3Eat%20a%20time%20and%20only%20at%20the%20end%20of%20another%20creature%u2019s%20turn.%20The%20%3Cbr%3Edragon%20regains%20spent%20legendary%20actions%20at%20the%20start%20of%20its%20turn.%3Cbr%3EDetect.%20The%20dragon%20makes%20a%20Wisdom%20%28Perception%29%20check.%3Cbr%3ETail%20Attack.%20The%20dragon%20makes%20a%20tail%20attack.%3Cbr%3EWing%20Attack%20%28Costs%202%20Actions%29.%20The%20dragon%20beats%20its%20wings.%20%3Cbr%3EEach%20creature%20within%2010%20feet%20of%20the%20dragon%20must%20succeed%20%3Cbr%3Eon%20a%20DC%2022%20Dexterity%20saving%20throw%20or%20take%2015%20%282d6%20+%208%29%20%3Cbr%3Ebludgeoning%20damage%20and%20be%20knocked%20prone.%20The%20dragon%20can%20%3Cbr%3Ethen%20fly%20up%20to%20half%20its%20flying%20speed.%3Cbr%3E%3CbrThe%20odor%20of%20sulfur%20and%20pumice%20surrounds%20a%20red%20dragon%2C%20%3Cbr%3Ewhose%20swept-back%20horns%20and%20spinal%20frill%20define%20its%20%3Cbr%3Esilhouette.%20Its%20beaked%20snout%20vents%20smoke%20at%20all%20times%2C%20%3Cbr%3Eand%20its%20eyes%20dance%20with%20flame%20when%20it%20is%20angry.%3Cbr%3E%3Cbr%3E";
 parser.parse(statblock);
 
-log(obj.bio);
+//log(obj);

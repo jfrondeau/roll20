@@ -7,7 +7,7 @@
   "dependencies": [],
   "modifies": {
   	"token": "read",
-    "gmnotes": "read",
+    "gmnotes": "read"
   },
   "conflicts": []
 }
