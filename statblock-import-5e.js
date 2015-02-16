@@ -19,12 +19,9 @@ on("chat:message", function(msg) {
         return;
     }
 
-    msg.who = msg.who.replace(" (GM)", "");
-    //msg.content = msg.content.replace("(GM) ", "");
     var command = msg.content.split(" ", 1);
 
     if (command != "!build-monster") {
-        sendChat('GM', "Commande " + command + " invalide");
         return;
     }
     if (!msg.selected) {
