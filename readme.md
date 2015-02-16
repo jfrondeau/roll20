@@ -17,7 +17,7 @@ BUG:
 Need to find a way to parse actions when Actions not present.
 Bug when crature has no traits (skeleton)
 
-Log
+LOG:
 Better clean text form percent-encoding and html tags.
 Challenge rating as fraction now ok.
 Bio not present won't break.
