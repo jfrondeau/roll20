@@ -1,9 +1,12 @@
 D&D 5e Statblock to Roll20.net character
 
-This script parse the content from a token GM note to create a complete 5e monster character sheet. If the monster already exist, it will be updated.
+This script parse the content from a token GM note to create a complete 5e monster character sheet. If the monster already exist, it will be updated. Actions are imported as inline roll, but the average value are keep too.
 
 Usage: copy statblock from PDF to a token gmnotes.
 Write !build-monster in chat and press enter!
+
+Options: (Add those line add the end of the script to change options)
+jf.whisperTraitsToGm = false; //Default to true. If true, the traits information will be prefixed with /w GM so only GM will see Traits when using Traits macro.
 
 The script can work arround some bad OCR pdf input, but if there is something wrong, here are the rules the script follow. 
 
