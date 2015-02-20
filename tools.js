@@ -5,7 +5,7 @@
     
     jf.tools = {
         version: 1,
-        RegisterHandlers: function () {
+        RegisterTHandlers: function () {
             on('chat:message', HandleInput);
         
             if(jf.rollMonsterHpOnDrop == true) {
@@ -35,6 +35,10 @@
     
 
     jf.rollHp = function(tokens) {
+        if(tokens == undefined){
+            log('No token selected');
+            return;
+        }
         if(tokens.length != undefined) {
             _.each(tokens, function (token) {
                 var obj = getObj('graphic', token._id);
@@ -47,7 +51,6 @@
     }
     
     function validateAndRollHp(token) {
-        log(token);
         if(token.get('type') != 'graphic' ||  token.get('subtype') !=  'token'){
             log('Invalide token (!graphic and !token)');
             return;
@@ -75,7 +78,7 @@
             sendChat('GM', 'Can\'t roll: Hit dice not defined'); return;
         }
             
-        var npc_constitution_mod = (getAttrByName(id, 'npc_constitution', 'current') - 10) / 2;            
+        var npc_constitution_mod = Math.floor( (getAttrByName(id, 'npc_constitution', 'current') - 10) / 2);            
         var total = 0;
         var nb_hit_dice = 1;
             
@@ -87,17 +90,19 @@
                 
                 // Ad Con modifier x number of hit dice
                 nb_hit_dice = rollResult.rolls[0].dice;
-                total = nb_hit_dice * npc_constitution_mod + total;
+                total = Math.floor( nb_hit_dice * npc_constitution_mod + total);
                 
                 if(jf.monsterAsMinHp == true)
                 {
                     // Calculate average HP, has written in statblock.
                     var nbFace = rollResult.rolls[0].sides;
                     var average_hp = Math.floor(((nbFace + 1) / 2 + npc_constitution_mod) * nb_hit_dice);
+                    log('Avg: ' + average_hp + ", Total: " + total);
                     if(average_hp > total) {
                         total = average_hp;
                     }
                 }
+                log(total);
                 callback(total);
             } 
         });
@@ -137,7 +142,7 @@
 on("ready",function(){
     log("Ready from Tools");
     'use strict';
-    jf.tools.RegisterHandlers();
+    jf.tools.RegisterTHandlers();
 });
 
-//jf.monsterAsMinHp = false;
+jf.monsterAsMinHp = true;
