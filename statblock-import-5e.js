@@ -364,9 +364,6 @@
         if(section.actions.indexOf('#')!==0)
             section.actions = '#' + section.actions;
 
-        log(section['actions']);
-        log('--');
-        
         var actions = splitRegex(section['actions'], /#((?:[A-Z][a-z]+[0-9-\s(\/)]{0,5})+)\./g);
         var cpt = 1;
 
@@ -378,8 +375,6 @@
                 jf.setAttribut(monster.id, 'npc_multiattack', value.replace(/\.#/g,'.\n').replace(/#/g,' '));
                 return;
             }
-
-            log(key + ': ' + value);
 
             jf.setAttribut(monster.id, 'npc_action_name' + cpt, jf.capitalizeEachWord(key));
             //var pos = value.indexOf('Hit:');
