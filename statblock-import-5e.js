@@ -338,7 +338,7 @@
     }
 
     function parseSkills(id){
-        var skills = {acrobatics: 'dexterity', "animal handling": 'wisdom', arcana: 'intelligence', athletics: 'strength', deception: 'charisma',history: 'intelligence',insigth: 'wisdom',intimidation: 'charisma',investigation: 'intelligence',medicine: 'wisdom',nature: 'intelligence',perception: 'wisdom',performance: 'charisma',persuasion: 'charisma',religion: 'intelligence',"sleight of Hand": 'dexterity', stealth: 'dexterity', survival: 'wisdom'};
+        var skills = {acrobatics: 'dexterity', "animal handling": 'wisdom', arcana: 'intelligence', athletics: 'strength', deception: 'charisma',history: 'intelligence',insight: 'wisdom',intimidation: 'charisma',investigation: 'intelligence',medicine: 'wisdom',nature: 'intelligence',perception: 'wisdom',performance: 'charisma',persuasion: 'charisma',religion: 'intelligence',"sleight of Hand": 'dexterity', stealth: 'dexterity', survival: 'wisdom'};
         input = section['skills'].replace(/Skills\s+/i, '');
         var regex = /(\w+).*?(\d+)/gi;
         while(match = regex.exec(input)){
