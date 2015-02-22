@@ -1,7 +1,9 @@
 (function (jf, undefined){
     jf.whisperTraitsToGm = true;
+    jf.createAbilityAsToken = true;
+    
     jf.statblock = {
-        version: "1.3",
+        version: "1.2",
         RegisterHandlers: function () {
             on('chat:message', HandleInput);
             log("JF Statblock ready");
@@ -122,7 +124,7 @@
         
         var obj = findObjs({_type: "ability", _characterid: id,  name: name});
         
-        if (obj.length == 0) {
+        if(obj.length == 0) {
             obj = jf.fixedCreateObj('ability', {
                 _characterid: id,
                 name: name,
@@ -130,26 +132,18 @@
                 action: action,
                 istokenaction: istokenaction
             });
-            status = 'Ability ' + name + ' created';
+            log("Creating ability " + name);
         } else {
             obj = getObj('ability', obj[0].id);
             status = 'Ability ' + name + ' updated';
             obj.set({description: description,
                 action: action,
                 istokenaction: istokenaction});
+            log("Updating ability " + name);
         }
         
         if(obj == undefined)
-            throw("Something prevent script to create or find character " + name);
-        /*
-        _id     A unique ID for this object. Globally unique across all objects in this campaign. Read-only.
-        _type   "ability"   Can be used to identify the object type or search for the object. Read-only.
-        _characterid    ""  The character this ability belongs to. Read-only. Mandatory when using createObj.
-        name    "Untitled_Ability"  
-        description ""  The description does not appear in the character sheet interface.
-        action  ""  The text of the ability.
-        istokenaction   false   Is this ability a token action that should show up when tokens linked to its parent Character are selected?
-        */
+            throw("Something prevent script to create or find ability " + name);
     }
 
     jf.ImportStatblock = function(token){
@@ -171,7 +165,7 @@
             var id = monster.id;
             
             token.set("represents", id);
-            log(monster);
+            
             
             if('abilities' in section) parseAbilities(id); // Be sure to process abilities first since other attributes need abilities modifier to be know.
             if('armor class' in section) parseArmorClass(id);
@@ -479,7 +473,7 @@
             }
             
             // Create token action
-            jf.setAbility(id, key, "", "%{selected|NPCAction"+cpt+"}", true);
+            jf.setAbility(id, key, "", "%{selected|NPCAction"+cpt+"}", jf.createAbilityAsToken);
             
             cpt++;
         }, this);
@@ -491,3 +485,7 @@ on("ready",function(){
     'use strict';
     jf.statblock.RegisterHandlers();
 });
+
+
+//jf.createAbilityAsToken = false;
+//jf.whisperTraitsToGm = false;
