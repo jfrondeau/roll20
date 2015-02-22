@@ -1,7 +1,7 @@
 (function (jf, undefined){
     jf.whisperTraitsToGm = true;
     jf.statblock = {
-        version: 1,
+        version: "1.2",
         RegisterHandlers: function () {
             on('chat:message', HandleInput);
             log("JF Statblock ready");
