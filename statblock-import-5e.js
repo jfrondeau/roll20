@@ -1,7 +1,7 @@
 (function (jf, undefined){
     jf.whisperTraitsToGm = true;
     jf.statblock = {
-        version: "1.22",
+        version: "1.3",
         RegisterHandlers: function () {
             on('chat:message', HandleInput);
             log("JF Statblock ready");
@@ -68,6 +68,7 @@
             obj.set({bio: bio});
         
         jf.setAttribut(obj.id, 'is_npc', 1);
+        
         return obj;
     }
 
@@ -114,6 +115,42 @@
         }
         return obj;
     }
+    
+    jf.setAbility = function(id, name, description, action, istokenaction){
+        if(name == undefined)
+            throw("Impossible to get ability if name not found");
+        
+        var obj = findObjs({_type: "ability", _characterid: id,  name: name});
+        
+        if (obj.length == 0) {
+            obj = jf.fixedCreateObj('ability', {
+                _characterid: id,
+                name: name,
+                description: description,
+                action: action,
+                istokenaction: istokenaction
+            });
+            status = 'Ability ' + name + ' created';
+        } else {
+            obj = getObj('ability', obj[0].id);
+            status = 'Ability ' + name + ' updated';
+            obj.set({description: description,
+                action: action,
+                istokenaction: istokenaction});
+        }
+        
+        if(obj == undefined)
+            throw("Something prevent script to create or find character " + name);
+        /*
+        _id     A unique ID for this object. Globally unique across all objects in this campaign. Read-only.
+        _type   "ability"   Can be used to identify the object type or search for the object. Read-only.
+        _characterid    ""  The character this ability belongs to. Read-only. Mandatory when using createObj.
+        name    "Untitled_Ability"  
+        description ""  The description does not appear in the character sheet interface.
+        action  ""  The text of the ability.
+        istokenaction   false   Is this ability a token action that should show up when tokens linked to its parent Character are selected?
+        */
+    }
 
     jf.ImportStatblock = function(token){
         log("Parsing statblock...");
@@ -132,6 +169,9 @@
                         
             var monster = jf.getCharacter(section.title, statblock.replace(/#/g, '<br>'), section.bio);
             var id = monster.id;
+            
+            token.set("represents", id);
+            log(monster);
             
             if('abilities' in section) parseAbilities(id); // Be sure to process abilities first since other attributes need abilities modifier to be know.
             if('armor class' in section) parseArmorClass(id);
@@ -419,8 +459,8 @@
                 return;
             }
             //log(key + ': ' + value);
-
-            jf.setAttribut(id, 'npc_action_name' + cpt, jf.capitalizeEachWord(key));
+            key = jf.capitalizeEachWord(key);
+            jf.setAttribut(id, 'npc_action_name' + cpt, key);
             
             var match = value.match(/(Each|Hit:)/);
             if(match != null) {
@@ -437,6 +477,10 @@
                 texte = texte.replace(/(\+(\d+))/g, '$1 : [[1d20+$2]]|[[1d20+$2]]');
                 jf.setAttribut(id, 'npc_action_description' + cpt, texte);
             }
+            
+            // Create token action
+            jf.setAbility(id, key, "", "%{selected|NPCAction"+cpt+"}", true);
+            
             cpt++;
         }, this);
     }   
