@@ -1,7 +1,7 @@
 (function (jf, undefined){
     jf.whisperTraitsToGm = true;
     jf.statblock = {
-        version: "1.2",
+        version: "1.22",
         RegisterHandlers: function () {
             on('chat:message', HandleInput);
             log("JF Statblock ready");
@@ -9,6 +9,7 @@
     }
     
     var status = '';
+    var errors = [];
     
     function HandleInput(msg){
         if (msg.type !== "api") {
@@ -116,10 +117,9 @@
 
     jf.ImportStatblock = function(token){
         log("Parsing statblock...");
-        
-        var errors = [];
         status = 'Nothing modified';
-        
+        errors = [];
+
         try {    
             var statblock = token.get('gmnotes').trim();
             
@@ -338,11 +338,31 @@
     }
 
     function parseSkills(id){
-        var skills = {acrobatics: 'dexterity', "animal handling": 'wisdom', arcana: 'intelligence', athletics: 'strength', deception: 'charisma',history: 'intelligence',insight: 'wisdom',intimidation: 'charisma',investigation: 'intelligence',medicine: 'wisdom',nature: 'intelligence',perception: 'wisdom',performance: 'charisma',persuasion: 'charisma',religion: 'intelligence',"sleight of Hand": 'dexterity', stealth: 'dexterity', survival: 'wisdom'};
+        var skills = {
+            acrobatics: 'dexterity',
+            "animal handling": 'wisdom',
+            arcana: 'intelligence',
+            athletics: 'strength',
+            deception: 'charisma',
+            history: 'intelligence',
+            insight: 'wisdom',
+            intimidation: 'charisma',
+            investigation: 'intelligence',
+            medicine: 'wisdom',
+            nature: 'intelligence',
+            perception: 'wisdom',
+            performance: 'charisma',
+            persuasion: 'charisma',
+            religion: 'intelligence',
+            "sleight of hand": 'dexterity',
+            stealth: 'dexterity',
+            survival: 'wisdom'
+        };
+
         input = section['skills'].replace(/Skills\s+/i, '');
-        var regex = /(\w+).*?(\d+)/gi;
+        var regex = /([\w\s]+).*?(\d+)/gi;
         while(match = regex.exec(input)){
-            var skill = match[1].toLowerCase();
+            var skill = match[1].trim().toLowerCase();
             if(skill in skills) {
                 var abilitymod = skills[skill];
                 var attr = 'npc_' + skill.replace(' ','') + '_bonus';
