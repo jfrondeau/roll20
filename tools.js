@@ -2,6 +2,7 @@
 
     jf.monsterAsMinHp = true; // generated token hp can't be lower than average hp
     jf.rollMonsterHpOnDrop = true; // will roll HP when character are dropped on map
+    jf.hpBarNumber = 3;
     
     jf.tools = {
         version: 1,
@@ -10,9 +11,10 @@
         
             if(jf.rollMonsterHpOnDrop == true) {
                 on("add:graphic", function(obj) {
-                    jf.rollHp(obj);
+                    jf.rollTokenHp(obj);
                 });
             }
+            log("Jf Tools ready");
         }
     }
     
@@ -23,124 +25,177 @@
         args = msg.content.split(/\s+/);
 
         switch(args[0]) {
-            case '!jf-rollHp':
-                return jf.rollHp(msg.selected); break;
+            case '!jf-rollhp':
+                return jf.rollHpForSelectedToken(msg); break;
             case '!jf-kill':
-                return jf.kill(msg.selected); break;
-            case '!jf-xp':
-                return jf.getXp(msg.selected); break;
-
+                return jf.kill(msg); break;
+            case '!jf-totalxp':
+                return jf.getTotalXP(msg); break;
+            case '!jf-clone':
+                return jf.cloneToken(msg, args[1]); break;
+            case '!jf-test':
+                return jf.test(msg); break;
         }
     }
     
-
-    jf.rollHp = function(tokens) {
-        if(tokens == undefined){
-            log('No token selected');
-            return;
+    jf.getSelectedToken = function(msg, callback, limit){
+        try{
+            if(msg.selected == undefined || msg.selected.length == undefined){
+                throw 'No token selected';
+            limit = parseInt(limit, 10);
+            if(limit == undefined || limit > msg.selected.length + 1 || limit < 0)
+                limit = msg.selected.length;
+                
+            for(i = 0; i < limit; i++){
+                if(selected[i]._type == 'graphic'){
+                    var obj = getObj('graphic', selected[i]._id);
+                    if(obj!==undefined && obj.get('subtype') == 'token'){
+                        callback(obj);
+                    }
+                }
+            }
         }
-        if(tokens.length != undefined) {
-            _.each(tokens, function (token) {
-                var obj = getObj('graphic', token._id);
-                validateAndRollHp(obj);
+        catch(e) {
+            log('Exception: ' + e);
+        }    
+    }
+    
+    jf.getSelectedTokenOld = function(msg, callback){
+        var res = [];
+        try{
+            if(msg.selected == undefined || msg.selected.length == undefined){
+                throw 'No token selected';
+            }
+            _.each(msg.selected, function(selected){
+                if(selected._type == 'graphic'){
+                    var obj = getObj('graphic', selected._id);
+                    if(obj!==undefined && obj.get('subtype') == 'token'){
+                        res.push(callback(obj));
+                    }
+                }
             });
         }
-        else {
-            validateAndRollHp(tokens);
+        catch(e) {
+            log('Exception: ' + e);
+        }
+        finally {
+            return res;
         }
     }
     
-    function validateAndRollHp(token) {
-        if(token.get('type') != 'graphic' ||  token.get('subtype') !=  'token'){
-            log('Invalide token (!graphic and !token)');
-            return;
-        }
+    jf.getTotalXP = function(msg){
+        var total = 0;
+        jf.getSelectedToken(msg, function(token){
+            total += parseInt(getAttrByName(token.get('represents'), 'npc_xp', 'current'),10);
+        });
         
+        var message = "Total xp: " + total;             
+        sendChat('GM', message);
+        log(message);
+    }
+    
+    jf.rollHpForSelectedToken = function(msg)
+    {
+        jf.getSelectedToken(msg, jf.rollTokenHp(token));
+    }
+    
+    jf.rollTokenHp = function(token){
+        var bar = 'bar' + jf.hpBarNumber;
         var represent = '';
-        if((represent = token.get('represents')) == '')
-        {
-            log('Token do not represent character');
-            return;
-        }
-        
-        if(token.get('bar3_link') == ""){
-            var total = RollCharacterHp(represent, function(total){
-                token.set({bar3_value: total, bar3_max: total})
+        try{
+            if((represent = token.get('represents')) == '')
+                throw('Token do not represent character');
+                 
+            if(token.get(bar + '_link') != "")
+                throw('Token ' + bar + ' is linked');
+                
+            rollCharacterHp(represent, function(total){
+                token.set(bar+'_value', total);
+                token.set(bar+'_max', total);
                 sendChat('GM', 'Hp rolled: ' + total);
             });
         }
-    }
-      
-    function RollCharacterHp(id, callback) {
-        var hd = getAttrByName(id, 'npc_HP_hit_dice', 'current');
-            
-        if(hd == ''){
-            sendChat('GM', 'Can\'t roll: Hit dice not defined'); return;
+        catch(e) {
+            log('Exception: ' + e);
         }
-            
-        var npc_constitution_mod = Math.floor( (getAttrByName(id, 'npc_constitution', 'current') - 10) / 2);            
+    }
+    
+    function rollCharacterHp(id, callback) {
+        var hd = getAttrByName(id, 'npc_HP_hit_dice', 'current');
+        if(hd == '')
+            throw 'Character has no HP Hit Dice defined';
+        
+        var match = hd.match(/^(\d+)d(\d+)$/);
+        if(match == null || match[1] == undefined || match[2] == undefined){
+            throw 'Character dont have valid HP Hit Dice format';
+        }
+        
+        var nb_dice = parseInt(match[1], 10);
+        var nb_face = parseInt(match[2], 10)
         var total = 0;
-        var nb_hit_dice = 1;
-            
+        
         sendChat("GM", "/roll " + hd, function(ops) {
             var rollResult = JSON.parse(ops[0].content);
             if(_.has(rollResult,'total'))
             {
-                var total = rollResult.total;
+                total = rollResult.total;
                 
-                // Ad Con modifier x number of hit dice
-                nb_hit_dice = rollResult.rolls[0].dice;
-                total = Math.floor( nb_hit_dice * npc_constitution_mod + total);
+                // Add Con modifier x number of hit dice
+                var npc_constitution_mod = Math.floor( (getAttrByName(id, 'npc_constitution', 'current') - 10) / 2);            
+                total = Math.floor(nb_dice * npc_constitution_mod + total);
                 
                 if(jf.monsterAsMinHp == true)
                 {
                     // Calculate average HP, has written in statblock.
-                    var nbFace = rollResult.rolls[0].sides;
-                    var average_hp = Math.floor(((nbFace + 1) / 2 + npc_constitution_mod) * nb_hit_dice);
-                    log('Avg: ' + average_hp + ", Total: " + total);
+                    var average_hp = Math.floor(((nb_face + 1) / 2 + npc_constitution_mod) * nb_dice);
+                    //log('Avg: ' + average_hp + ", Total: " + total);
                     if(average_hp > total) {
                         total = average_hp;
                     }
                 }
-                log(total);
                 callback(total);
             } 
         });
     }
-
-    jf.kill = function(tokens){
-        tokens = jf.getTokens(tokens);
-
-        if(tokens.length == 0)
-            return "Aucun token selectionné";
-
-        _.each(tokens, function (obj) {
-            obj.set("status_dead", true);
-            obj.set('bar3_value', 0);
-        });
     
-        //sendChat('JF Tool', 'Xp total: ' + total);
+    jf.cloneToken = function (msg, number) {
+        var counter = 1;
+        jf.getSelectedToken(msg, function(token, number){
+            number = parseInt(number, 10) || 1;
+            
+            createObj("graphic", {
+                    name: obj.get("name") + ' ' + counter++,
+                    controlledby: obj.get("controlledby"),
+                    left: obj.get("left")+70,
+                    top: obj.get("top"),
+                    width: obj.get("width"),
+                    height: obj.get("height"),
+                    //bar1_value: obj.get("bar1_value"),
+                    //bar1_max: obj.get("bar1_max"),
+                    showname: true,
+                    //showplayers_name: true,
+                    //showplayers_bar1: true,
+                    imgsrc: obj.get("imgsrc"),
+                    pageid: obj.get("pageid"),
+                    represents: obj.get('represents'),
+                    layer: "objects"
+            });
+        }, 1);
     }
 
-    jf.getXp = function(tokens){
-        tokens = jf.getTokens(tokens);
-        if(tokens.length == 0)
-            return "Aucun token selectionné";
-    
-        var total = 0;
-        
-        _.each(tokens, function (obj) {
-            var xp = getAttrByName(obj.get('represents'), 'npc_xp', 'current');
-            total = total + parseInt(xp);
-        });
-    
-        sendChat('GM', 'Total XP: ' + total);
-    };
+    //********************************************
 
+    jf.kill = function(msg){
+        getSelectedToken(msg, function(token){
+            token.set("status_dead", true);
+            token.set('bar3_value', 0);
+        })
+    }
+
+  
 }(typeof jf === 'undefined' ? jf = {} : jf));
 
 on("ready",function(){
-    log("Ready from Tools");
     'use strict';
     jf.tools.RegisterTHandlers();
 });

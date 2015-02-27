@@ -1,9 +1,10 @@
 (function (jf, undefined){
     jf.whisperTraitsToGm = true;
     jf.createAbilityAsToken = true;
+    jf.usePowerAbility = false;
     
     jf.statblock = {
-        version: "1.2",
+        version: "1.3",
         RegisterHandlers: function () {
             on('chat:message', HandleInput);
             log("JF Statblock ready");
@@ -13,33 +14,57 @@
     var status = '';
     var errors = [];
     
-    function HandleInput(msg){
-        if (msg.type !== "api") {
-            return;
-        }
-
-        if(msg.content != '!build-monster')
-            return;
-
-        if (!msg.selected) {
-            sendChat("GM", "No token selected");
-            return;
-        }
-
-        var token = getObj("graphic", msg.selected[0]._id);
-        if (token.get("subtype") != 'token') {
-            sendChat("GM", "No token selected");
-            return;
-        }
+    function HandleInput(msg) {
         
-        jf.ImportStatblock(token);
+        if (msg.type !== "api") {return;}
+
+        args = msg.content.split(/\s+/);
+
+        switch(args[0]) {
+            case '!build-monster':
+            case '!jf-parse':
+                jf.getSelectedToken(msg, jf.ImportStatblock);
+                break;
+        }
     }
     
-
+    jf.getSelectedToken = jf.getSelectedToken || function(msg, callback, limit){
+        try{
+            if(msg.selected == undefined || msg.selected.length == undefined)
+                throw 'No token selected';
+            
+            limit = parseInt(limit, 10) | 0;
+            
+            if(limit == undefined || limit > msg.selected.length + 1 || limit < 1)
+                limit = msg.selected.length;
+            
+            for(i = 0; i < limit; i++){
+                if(msg.selected[i]._type == 'graphic'){
+                    var obj = getObj('graphic', msg.selected[i]._id);
+                    if(obj!==undefined && obj.get('subtype') == 'token'){
+                        callback(obj);
+                    }
+                }
+            }
+        }
+        catch(e) {
+            log('Exception: ' + e);
+        }    
+    }
+   
     jf.capitalizeEachWord = function(str) {
         return str.replace(/\w\S*/g, function(txt) {
             return txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase();
         });
+    }
+    
+    jf.fixedCreateObj = jf.fixedCreateObj || function() {
+        //Aaron fix
+        var obj = createObj.apply(this, arguments);
+        if (obj && !obj.fbpath) {
+            obj.fbpath = obj.changed._fbpath.replace(/([^\/]*\/){4}/, "/");
+        }
+        return obj;
     }
 
     jf.getCharacter = function(name, gmnotes, bio) {
@@ -77,7 +102,7 @@
     jf.setAttribut = function(id, name, currentVal, max) {
         
         if(name == undefined)
-            throw("Attribut non défini pour la valeur " + currentVal);
+            throw("Name required to set attribut");
         
         max = max || '';
         
@@ -109,18 +134,10 @@
             }
         }
     }
-
-    jf.fixedCreateObj = jf.fixedCreateObj || function() {
-        var obj = createObj.apply(this, arguments);
-        if (obj && !obj.fbpath) {
-            obj.fbpath = obj.changed._fbpath.replace(/([^\/]*\/){4}/, "/");
-        }
-        return obj;
-    }
     
     jf.setAbility = function(id, name, description, action, istokenaction){
         if(name == undefined)
-            throw("Impossible to get ability if name not found");
+            throw("Name required to set ability");
         
         var obj = findObjs({_type: "ability", _characterid: id,  name: name});
         
@@ -135,7 +152,6 @@
             log("Creating ability " + name);
         } else {
             obj = getObj('ability', obj[0].id);
-            status = 'Ability ' + name + ' updated';
             obj.set({description: description,
                 action: action,
                 istokenaction: istokenaction});
@@ -144,6 +160,18 @@
         
         if(obj == undefined)
             throw("Something prevent script to create or find ability " + name);
+    }
+    
+    jf.getAttribut = function(id, name){
+        if(name == undefined)
+            throw("undefined attribute");
+           
+        var attr = findObjs({
+            _type: 'attribute',
+            _characterid: id,
+            name: name
+        })[0];
+        return attr!=undefined ? attr.get('current') : false;
     }
 
     jf.ImportStatblock = function(token){
@@ -473,11 +501,45 @@
             }
             
             // Create token action
-            jf.setAbility(id, key, "", "%{selected|NPCAction"+cpt+"}", jf.createAbilityAsToken);
+            if(jf.usePowerAbility)
+                jf.setAbility(id, key, "", powercardAbility(id,cpt), jf.createAbilityAsToken);
+            else
+                jf.setAbility(id, key, "", "%{selected|NPCAction"+cpt+"}", jf.createAbilityAsToken);
             
             cpt++;
         }, this);
     }   
+    
+    function powercardAbility(id, npcActionNumber){
+        //From Skilf
+        var action_name = jf.getAttribut(id,"npc_action_name"+npcActionNumber );
+        var action_desc = jf.getAttribut(id,"npc_action_description"+npcActionNumber );
+        var action_effect = jf.getAttribut(id,"npc_action_effect"+npcActionNumber );
+        var action_multi = jf.getAttribut(id,"npc_action_multiattack"+npcActionNumber );
+        var action_type = jf.getAttribut(id,"npc_action_type"+npcActionNumber );
+        
+        if (action_type!==false){
+            action_type=action_type.substring(action_type.indexOf("(")+1, action_type.lastIndexOf(")")).trim().toLowerCase();
+            if (action_type.indexOf(" ")!=-1){action_type=action_type.substring(0, action_type.lastIndexOf(" ")).trim();}
+        } else { 
+            action_type="normal";
+        }
+        if (action_multi!==false){multi_str=" --Multiattack|Yes "; } else { multi_str=""; }
+       
+        var attack_type = action_desc.substring(0,action_desc.indexOf(":"));
+        var attack_bonus = action_desc.substring(action_desc.indexOf(":")+1, action_desc.lastIndexOf(":")).trim();
+        var attack_desc = action_desc.substring(action_desc.indexOf(","));
+        var attack_string = "[[d20"+attack_bonus+"]]|[[d20"+attack_bonus+"]]";
+       
+        var hit_value =  action_effect.substring(action_effect.indexOf("(")+1, action_effect.indexOf(")")).trim();
+        var hit_desc =  action_effect.substring(action_effect.indexOf(")")+1);
+       
+        var powertext = "!power --charid|"+id+" --emote|"+section.title+" uses "+ action_name +"  --format|"+action_type+" --name|"+ action_name +"  --leftsub|"+action_type+" --rightsub|"+attack_type+multi_str+" --Attack|"+attack_string+" "+attack_desc+" --Hit|"+hit_value+" "+hit_desc;
+        if (jf.whisperTraitsToGm==true) {
+            powertext=powertext+" --whisper|GM";
+        }
+        return powertext;
+    }
 
 }(typeof jf === 'undefined' ? jf = {} : jf));
 
@@ -486,6 +548,6 @@ on("ready",function(){
     jf.statblock.RegisterHandlers();
 });
 
-
 //jf.createAbilityAsToken = false;
 //jf.whisperTraitsToGm = false;
+jf.usePowerAbility = true;
