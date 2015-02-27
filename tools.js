@@ -1,11 +1,11 @@
 (function (jf, undefined){
 
-    jf.monsterAsMinHp = true; // generated token hp can't be lower than average hp
+    jf.monsterAsMinHp = true; // generated token hp can't be lower than the average hp
     jf.rollMonsterHpOnDrop = true; // will roll HP when character are dropped on map
-    jf.hpBarNumber = 3;
+    jf.hpBarNumber = 1;
     
     jf.tools = {
-        version: 1,
+        version: 1.1,
         RegisterTHandlers: function () {
             on('chat:message', HandleInput);
         
@@ -33,22 +33,22 @@
                 return jf.getTotalXP(msg); break;
             case '!jf-clone':
                 return jf.cloneToken(msg, args[1]); break;
-            case '!jf-test':
-                return jf.test(msg); break;
         }
     }
     
-    jf.getSelectedToken = function(msg, callback, limit){
+    jf.getSelectedToken = jf.getSelectedToken || function(msg, callback, limit){
         try{
-            if(msg.selected == undefined || msg.selected.length == undefined){
-                throw 'No token selected';
-            limit = parseInt(limit, 10);
-            if(limit == undefined || limit > msg.selected.length + 1 || limit < 0)
+            if(msg.selected == undefined || msg.selected.length == undefined)
+                throw('No token selected');
+            
+            limit = parseInt(limit, 10) | 0;
+            
+            if(limit == undefined || limit > msg.selected.length + 1 || limit < 1)
                 limit = msg.selected.length;
-                
+            
             for(i = 0; i < limit; i++){
-                if(selected[i]._type == 'graphic'){
-                    var obj = getObj('graphic', selected[i]._id);
+                if(msg.selected[i]._type == 'graphic'){
+                    var obj = getObj('graphic', msg.selected[i]._id);
                     if(obj!==undefined && obj.get('subtype') == 'token'){
                         callback(obj);
                     }
@@ -58,29 +58,6 @@
         catch(e) {
             log('Exception: ' + e);
         }    
-    }
-    
-    jf.getSelectedTokenOld = function(msg, callback){
-        var res = [];
-        try{
-            if(msg.selected == undefined || msg.selected.length == undefined){
-                throw 'No token selected';
-            }
-            _.each(msg.selected, function(selected){
-                if(selected._type == 'graphic'){
-                    var obj = getObj('graphic', selected._id);
-                    if(obj!==undefined && obj.get('subtype') == 'token'){
-                        res.push(callback(obj));
-                    }
-                }
-            });
-        }
-        catch(e) {
-            log('Exception: ' + e);
-        }
-        finally {
-            return res;
-        }
     }
     
     jf.getTotalXP = function(msg){
@@ -94,9 +71,8 @@
         log(message);
     }
     
-    jf.rollHpForSelectedToken = function(msg)
-    {
-        jf.getSelectedToken(msg, jf.rollTokenHp(token));
+    jf.rollHpForSelectedToken = function(msg){
+        jf.getSelectedToken(msg, jf.rollTokenHp);
     }
     
     jf.rollTokenHp = function(token){
@@ -148,7 +124,6 @@
                 {
                     // Calculate average HP, has written in statblock.
                     var average_hp = Math.floor(((nb_face + 1) / 2 + npc_constitution_mod) * nb_dice);
-                    //log('Avg: ' + average_hp + ", Total: " + total);
                     if(average_hp > total) {
                         total = average_hp;
                     }
@@ -159,36 +134,43 @@
     }
     
     jf.cloneToken = function (msg, number) {
-        var counter = 1;
-        jf.getSelectedToken(msg, function(token, number){
+        
+        log('Cloning ' + number);
+        
+        jf.getSelectedToken(msg, function(token){
             number = parseInt(number, 10) || 1;
+            var imgsrc = token.get('imgsrc').replace('/max.', '/thumb.');
             
-            createObj("graphic", {
-                    name: obj.get("name") + ' ' + counter++,
-                    controlledby: obj.get("controlledby"),
-                    left: obj.get("left")+70,
-                    top: obj.get("top"),
-                    width: obj.get("width"),
-                    height: obj.get("height"),
-                    //bar1_value: obj.get("bar1_value"),
-                    //bar1_max: obj.get("bar1_max"),
+            for(i = 0; i < number; i++){
+                var left = (parseInt(token.get("left")) + (70 * (i+1)));
+                var obj = createObj("graphic", {
+                    name: token.get("name") + ' ' + randomInteger(99),
+                    controlledby: token.get("controlledby"),
+                    left: left,
+                    top: token.get("top"),
+                    width: token.get("width"),
+                    height: token.get("height"),
                     showname: true,
+                    imgsrc: imgsrc,
+                    pageid: token.get("pageid"),
+                    represents: token.get('represents'),
                     //showplayers_name: true,
                     //showplayers_bar1: true,
-                    imgsrc: obj.get("imgsrc"),
-                    pageid: obj.get("pageid"),
-                    represents: obj.get('represents'),
+                    //bar1_value: token.get("bar1_value"),
+                    //bar1_max: token.get("bar1_max"),
                     layer: "objects"
-            });
+                });
+                if(jf.rollMonsterHpOnDrop == true)
+                    jf.rollTokenHp(obj);
+            }
         }, 1);
     }
 
-    //********************************************
-
     jf.kill = function(msg){
-        getSelectedToken(msg, function(token){
+        var bar = 'bar' + jf.hpBarNumber + "_value";
+        jf.getSelectedToken(msg, function(token){
             token.set("status_dead", true);
-            token.set('bar3_value', 0);
+            //token.set('bar', 0);
         })
     }
 
@@ -200,4 +182,6 @@ on("ready",function(){
     jf.tools.RegisterTHandlers();
 });
 
-jf.monsterAsMinHp = true;
+//jf.monsterAsMinHp = true;         // default: true. Generated token hp can't be lower than the average hp
+//jf.rollMonsterHpOnDrop = true;    // default: true. Will roll HP when character are dropped on map
+//jf.hpBarNumber = 1;               // default 1. 1 = green bar, 2 = blue bar, 3 = red bar.

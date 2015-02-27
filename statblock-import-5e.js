@@ -4,7 +4,7 @@
     jf.usePowerAbility = false;
     
     jf.statblock = {
-        version: "1.3",
+        version: "1.4",
         RegisterHandlers: function () {
             on('chat:message', HandleInput);
             log("JF Statblock ready");
@@ -164,7 +164,7 @@
     
     jf.getAttribut = function(id, name){
         if(name == undefined)
-            throw("undefined attribute");
+            throw("undefined attribute name to get");
            
         var attr = findObjs({
             _type: 'attribute',
@@ -385,7 +385,7 @@
     function parseSavingThrow(id){
         var regex = /(STR|DEX|CON|INT|WIS|CHA).*?(\d+)/gi;
         var attr, value;
-        while(match = regex.exec(section['saving throws'])){            
+        while(match = regex.exec(section['saving throws'])){
             switch(match[1].toLowerCase())
             {
                 case 'str': attr = 'npc_strength'; break;
@@ -550,4 +550,4 @@ on("ready",function(){
 
 //jf.createAbilityAsToken = false;
 //jf.whisperTraitsToGm = false;
-jf.usePowerAbility = true;
+//jf.usePowerAbility = false;
