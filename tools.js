@@ -1,3 +1,4 @@
+
 (function (jf, undefined){
 
     jf.monsterAsMinHp = true; // generated token hp can't be lower than the average hp
@@ -33,6 +34,8 @@
                 return jf.getTotalXP(msg); break;
             case '!jf-clone':
                 return jf.cloneToken(msg, args[1]); break;
+            case '!jf-test':
+                return jf.test(msg); break;
         }
     }
     
@@ -138,13 +141,21 @@
         log('Cloning ' + number);
         
         jf.getSelectedToken(msg, function(token){
+            var match = token.get('imgsrc').match(/images\/.*\/(thumb|max)/i);
+            
+            if(match == null)
+                throw("The token imgsrc do not come from you library. Unable to clone");
+                
             number = parseInt(number, 10) || 1;
             var imgsrc = token.get('imgsrc').replace('/max.', '/thumb.');
+            var name = token.get("name") + " ";
+            log(name);
+            token.set({"name": name + randomInteger(99), showname: true});
             
             for(i = 0; i < number; i++){
                 var left = (parseInt(token.get("left")) + (70 * (i+1)));
                 var obj = createObj("graphic", {
-                    name: token.get("name") + ' ' + randomInteger(99),
+                    name: name + randomInteger(99),
                     controlledby: token.get("controlledby"),
                     left: left,
                     top: token.get("top"),
@@ -172,6 +183,13 @@
             token.set("status_dead", true);
             //token.set('bar', 0);
         })
+    }
+    
+    jf.test = function(msg){
+        jf.getSelectedToken(msg, function(token){
+            var imgsrc = token.get('imgsrc');
+            log(imgsrc);
+        }, 1);
     }
 
   
