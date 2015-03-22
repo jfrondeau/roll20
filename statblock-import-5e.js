@@ -1,19 +1,20 @@
 
 (function(jf, undefined) {
-    jf.whisperTraitsToGm = true;
+    
     jf.createAbilityAsToken = true;
     jf.usePowerAbility = false;
 
     jf.statblock = {
-        version: "1.6",
+        version: "2.0",
         RegisterHandlers: function() {
             on('chat:message', HandleInput);
             log("JF Statblock ready");
         }
     }
 
-    var status = '';
-    var errors = [];
+    var status = ''; // To display in chat
+    var errors = []; // To log error
+    var characterId = null;
 
     function HandleInput(msg) {
 
@@ -34,7 +35,7 @@
     jf.getSelectedToken = jf.getSelectedToken || function(msg, callback, limit) {
         try {
             if(msg.selected == undefined || msg.selected.length == undefined)
-                throw 'No token selected';
+                throw('No token selected');
 
             limit = parseInt(limit, 10) | 0;
 
@@ -51,6 +52,7 @@
             }
         } catch(e) {
             log('Exception: ' + e);
+            sendChat('GM', '/w GM ' + e);
         }
     }
 
@@ -60,30 +62,15 @@
         });
     }
 
-    jf.fixedCreateObj = jf.fixedCreateObj || function() {
-        //Aaron fix
-        var obj = createObj.apply(this, arguments);
-        if(obj && !obj.fbpath) {
-            obj.fbpath = obj.changed._fbpath.replace(/([^\/]*\/){4}/, "/");
-        }
-        return obj;
-    }
-
-    jf.getCharacter = function(name, gmnotes, bio) {
+    jf.setCharacter = function(name, gmnotes, bio) {        
         if(name == undefined)
-            throw("Impossible to create or update character if name not found");
-
+            throw("Name require to get or create character");
         name = jf.capitalizeEachWord(name);
 
-        var obj = findObjs({
-            _type: "character",
-            name: name
-        });
+        var obj = findObjs({_type: "character",name: name});
 
         if(obj.length == 0) {
-            obj = jf.fixedCreateObj('character', {
-                name: name
-            });
+            obj = createObj('character', {name: name});
             status = 'Character ' + name + ' created';
         } else {
             obj = getObj('character', obj[0].id);
@@ -94,21 +81,45 @@
             throw("Something prevent script to create or find character " + name);
 
         if(gmnotes != undefined)
-            obj.set({
-                gmnotes: gmnotes
-            });
+            obj.set({gmnotes: gmnotes});
 
         if(bio != undefined)
-            obj.set({
-                bio: bio
-            });
+            obj.set({bio: bio});
 
-        jf.setAttribut(obj.id, 'is_npc', 1);
-
+        characterId = obj.id;
+        setAttribut('is_npc', 1);     
+        
         return obj;
     }
 
-    jf.setAttribut = function(id, name, currentVal, max) {
+    jf.ImportStatblock = function(token) {
+        status = 'Nothing modified';
+        errors = [];
+        try {
+            var statblock = token.get('gmnotes').trim();
+
+            if(statblock == '')
+                throw("Selected token GM Notes was empty.");
+            
+            jf.parseStatblock(statblock);
+            if(characterId != null)
+                token.set("represents", characterId);
+        } catch(e) {
+            status = "Parsing was incomplete due to error(s)";
+            log(e);
+            errors.push(e);
+        }
+
+        log(status);
+        sendChat('GM', '/w GM ' + status);
+
+        if(errors.length > 0) {
+            log(errors.join('\n'));
+            sendChat('GM', '/w GM Error(s):\n/w GM ' + errors.join('\n/w GM '));
+        }
+    }
+    
+    function setAttribut (name, currentVal, max) {
 
         if(name == undefined)
             throw("Name required to set attribut");
@@ -120,299 +131,258 @@
             return;
         }
 
-        var attr = findObjs({
-            _type: 'attribute',
-            _characterid: id,
-            name: name
-        })[0];
+        var attr = findObjs({_type: 'attribute', _characterid: characterId, name: name})[0];
 
         if(attr == undefined) {
             log("Creating attribut " + name);
-            createObj('attribute', {
-                name: name,
-                current: currentVal,
-                max: max,
-                characterid: id
-            });
-        } 
-        else {             
-            if(attr.get('current') == undefined || attr.get('current').toString() != currentVal) {
-                log("Updating attribut " + name);
-                attr.set({
-                    current: currentVal,
-                    max: max
-                });
-            }
+            createObj('attribute', {name: name, current: currentVal, max: max, characterid: characterId});
+        } else if (attr.get('current') == undefined || attr.get('current').toString() != currentVal) {
+            log("Updating attribut " + name);
+            attr.set({current: currentVal, max: max});
         }
     }
 
-    jf.setAbility = function(id, name, description, action, istokenaction) {
+    function setAbility(name, description, action, istokenaction) {
         if(name == undefined)
             throw("Name required to set ability");
 
-        var obj = findObjs({
-            _type: "ability",
-            _characterid: id,
-            name: name
-        });
-        
-        if(obj == undefined)
+        var ability = findObjs({_type: "ability", _characterid: characterId, name: name });
+
+        if(ability == undefined)
             throw("Something prevent script to create or find ability " + name);
-        
-        if(obj.length == 0) {
-            obj = jf.fixedCreateObj('ability', {
-                _characterid: id,
-                name: name,
-                description: description,
-                action: action,
-                istokenaction: istokenaction
+
+        if(ability.length == 0) {
+            ability = createObj('ability', {
+                _characterid: characterId, name: name, description: description, action: action, istokenaction: istokenaction
             });
             log("Ability " + name + " created");
-        } 
-        else {
-            obj = getObj('ability', obj[0].id);
-            if(obj.get('description') != description || obj.get('action') !== action || obj.get('istokenaction')!=istokenaction){
-                obj.set({
-                    description: description,
-                    action: action,
-                    istokenaction: istokenaction
-                });
+        } else {
+            ability = getObj('ability', ability[0].id);
+            if(ability.get('description') != description || ability.get('action') !== action || ability.get('istokenaction') != istokenaction) {
+                ability.set({description: description, action: action, istokenaction: istokenaction });
                 log("Ability " + name + " updated");
             }
         }
     }
+    
+    jf.parseStatblock = function(statblock){
 
-    jf.getAttribut = function(id, name) {
-        if(name == undefined)
-            throw("undefined attribute name to get");
-
-        var attr = findObjs({
-            _type: 'attribute',
-            _characterid: id,
-            name: name
-        })[0];
-        return attr != undefined ? attr.get('current') : false;
+        log("---- Parsing statblock ----");
+        
+        texte = clean(statblock);
+        var keyword = findKeyword(texte);
+        var section = splitStatblock(texte, keyword);
+        
+        jf.setCharacter(section.attr.name, '', section.bio);
+        
+        processSection(section);
     }
-
-    jf.ImportStatblock = function(token) {
-        status = 'Nothing modified';
-        errors = [];
-
-        try {
-            var statblock = token.get('gmnotes').trim();
-
-            if(statblock == '')
-                throw("This token GM Notes was empty.");
-
-            var id = jf.parseStatblock(statblock);
-            token.set("represents", id);
-        } catch(e) {
-            status = "Parsing was incomplete due to error(s)";
-            errors.push(e);
-        }
-
-        log(status);
-        sendChat('GM', '/w GM ' + status);
-
-        if(errors.length > 0) {
-            log(errors);
-            sendChat('GM', '/w GM Error(s):\n/w GM ' + errors.join('\n/w GM '));
-        }
-    }
-
-
-    jf.parseStatblock = function(statblock) {
-        log("+++++ Parsing statblock ++++++");
-        //Clean text     
+    
+    function clean(statblock)
+    {
         statblock = unescape(statblock);
         statblock = statblock.replace(/–/g, '-');
-        statblock = statblock.replace(/<br[^>]*>/g, '#').replace(/(<([^>]+)>)/ig, ""); 
-        statblock = statblock.replace(/#\s+/g, '#');
-        statblock = statblock.replace(/#(?=[^A-Z1-9])/g, '');
-        statblock = statblock.replace(/[#\s]+$/g, '');
+        statblock = statblock.replace(/<br[^>]*>/g, '#').replace(/(<([^>]+)>)/ig, "");
+        statblock = statblock.replace(/\s+#\s+/g, '#');
+        statblock = statblock.replace(/#(?=[a-z])/g, ' ');
         statblock = statblock.replace(/\s+/g, ' ');
-        section = splitSection(statblock);
-
-        var monster = jf.getCharacter(section.title, statblock.replace(/#/g, '<br>'), section.bio);
-        var id = monster.id;
-
-        if('abilities' in section) parseAbilities(id); // Be sure to process abilities first since other attributes need abilities modifier to be know.
-        if('armor class' in section) parseArmorClass(id);
-        if('size' in section) parseSize(id);
-        if('hit points' in section) parseHp(id);
-        if('speed' in section) parseSpeed(id);
-        if('challenge' in section) parseChallenge(id);
-        if('saving throws' in section) parseSavingThrow(id);
-        if('skills' in section) parseSkills(id);
-
-        if('damage immunities' in section) jf.setAttribut(id, 'npc_damage_immunity', section['damage immunities']);
-        if('condition immunities' in section) jf.setAttribut(id, 'npc_condition_immunity', section['condition immunities']);
-        if('damage vulnerabilities' in section) jf.setAttribut(id, 'npc_damage_vulnerability', section['damage vulnerabilities']);
-        if('senses' in section) jf.setAttribut(id, 'npc_senses', section['senses']);
-        if('languages' in section) jf.setAttribut(id, 'npc_languages', section['languages']);
-        if('damage resistances' in section) jf.setAttribut(id, 'npc_damage_resistance', section['damage resistances']);
-
-
-        if('traits' in section) parseTraits(id);
-        if('actions' in section) parseActions(id);
-
-        return id;
+     
+        //log(statblock)  ;
+        return statblock;
     }
 
-    function splitRegex(source, regex) {
-        var precedentKey = 'debut';
-        var precedentIndex = 0;
-        var debut = 0;
-        var section = {};
-
-        while(match = regex.exec(source)) {
-            section[precedentKey] = source.substring(debut, match.index).trim();
-            precedentKey = match[1].toLowerCase();
-            debut = match.index + precedentKey.length + 2;
+    function findKeyword(statblock)
+    {
+        var keyword = {
+            attr: {}, 
+            traits:{}, 
+            actions:{}, 
+            legendary:{}
+        };
+        
+        var indexAction = 0;
+        var indexLegendary = statblock.length;
+        
+        // Standard keyword
+        var regex = /#\s*(tiny|small|medium|large|huge|gargantuan|armor class|hit points|speed|str|dex|con|int|wis|cha|saving throws|skills|damage resistances|damage immunities|condition immunities|damage vulnerabilities|senses|languages|challenge|traits|actions|legendary actions)(?=\s|#)/gi;
+        while(match = regex.exec(statblock)){
+            key = match[1].toLowerCase();
+            
+            if(key == 'actions') {
+                indexAction = match.index;
+                keyword.actions.Actions = match.index;
+            } else if (key == 'legendary actions'){
+                indexLegendary = match.index;  
+                keyword.legendary.Legendary = match.index;
+            } else {
+                keyword.attr[key] = match.index;
+            }
         }
-        section[precedentKey] = source.substring(debut).trim();
-
-        if(section.debut == '') delete section.debut;
-
-        return section;
+        
+        // Power
+        regex = /(?:#|\.\s+)([A-Z][\w-]+(?:\s(?:[A-Z][\w-]+|[\(\)\d/-]|of)+)*)(?=\s*\.)/g;
+        while(match = regex.exec(statblock)){
+            if(keyword.attr[match[1].toLowerCase()] == undefined)
+            {
+                if(match.index < indexAction)
+                    keyword.traits[match[1]] = match.index;
+                else if(match.index < indexLegendary)
+                    keyword.actions[match[1]] = match.index;
+                else
+                    keyword.legendary[match[1]] = match.index;
+            }   
+        }
+        
+        return keyword;
     }
 
-    function splitSection(statblock) {
-        var sectionTraits;
-        var bio;
-
+    function splitStatblock(statblock, keyword)
+    {
         // Check for bio (flavor texte) at the end, separated by at least 3 line break.
+        var bio;
         if((pos = statblock.indexOf('###')) != -1) {
-            bio = statblock.substring(pos + 3);
+            bio = statblock.substring(pos + 4).replace(/#/g, "<br>").trim();
             statblock = statblock.slice(0, pos);
         }
-
-        // Looking for index of Traits section
-        var match = statblock.match(/#(?!armor class|hit points|speed|str|dex|con|int|wis|cha|saving throws|skills|damage resistances|damage immunities|condition immunities|damage vulnerabilities|senses|languages|challenge|traits|actions|legendary actions)((?:[A-Z][a-z]+[0-9-\s(\/)]{0,5})+)\./i);
-        if(null == match) {
-            match = statblock.indexOf('/#actions/gi');
-            if(null == match) {
-                log("Warning: no traits ans Actions found...")
+        
+        var debut = 0;
+        var fin = 0;
+        var keyName = 'name';
+        var sectionName = 'attr';
+        
+        for(var section in keyword){
+            var obj = keyword[section];
+            for(var key in obj){
+                var fin = parseInt(obj[key], 10);
+                keyword[sectionName][keyName] = extractSection(statblock, debut, fin, keyName);
+                keyName = key;
+                debut = fin;
+                sectionName = section;
             }
-            sectionTraits = statblock.slice(match.index);
-            statblock = statblock.slice(0, match.index);
         }
-        if(null != match) {
-            sectionTraits = statblock.slice(match.index);
-            statblock = statblock.slice(0, match.index);
-        }
+        keyword[sectionName][keyName] = extractSection(statblock, debut, statblock.length, keyName);
 
-        // Split statblock attributes
-        var regex = /#\s*(armor class|hit points|speed|str|dex|con|int|wis|cha|saving throws|skills|damage resistances|damage immunities|condition immunities|damage vulnerabilities|senses|languages|challenge)(?:\s|#)/gmi;
-        var section = splitRegex(statblock, regex);
-
-        //  add title and size
-        var pos = section.debut.indexOf('#');
-        if(pos != -1) {
-            section.title = section.debut.slice(0, pos);
-            section.size = section.debut.slice(pos);
-        } else
-            section.title = section.debut;
-        delete section.debut;
-
-        if(bio != undefined)
-            section.bio = bio;
-
-        // regroup abilities
+        delete keyword.actions.Actions;
+        delete keyword.legendary.Legendary;
+        
+        if(bio != null)  keyword.bio = bio;
+        
+        // Patch for multiline abilities
         var abilitiesName = ['str', 'dex', 'con', 'int', 'wis', 'cha'];
         var abilities = '';
         for(i = 0, len = abilitiesName.length; i < len; ++i) {
-            if(section[abilitiesName[i]] != undefined) {
-                abilities += section[abilitiesName[i]] + ' ';
-                delete section[abilitiesName[i]];
+            if(keyword.attr[abilitiesName[i]] != undefined) {
+                abilities += keyword.attr[abilitiesName[i]] + ' ';
+                delete keyword.attr[abilitiesName[i]]
             }
         }
-        section.abilities = abilities;
-
-        // Clean section
-        _.each(section, function(value, key) {
-            section[key] = value.replace(/\.#/g, '.\n').replace(/#/g, '');
-        });
-
-        // Split rest of statblock as trait, action and legendary action. 
-        if(sectionTraits != undefined) {
-            var traits = splitRegex(sectionTraits, /#\s*(actions|legendary actions)(?:\s|#)/gmi);
-            traits['traits'] = traits['debut'];
-            delete traits['debut'];
-
-            if(traits.actions == undefined) {
-                traits.actions = traits.traits;
-                delete traits.traits;
-            }
-
-            // Combine traits to section1
-            for(var attrname in traits) {
-                section[attrname] = traits[attrname];
+        keyword.attr.abilities = abilities;
+        
+        // Size attribut:
+        var size = ['tiny','small','medium','large','huge','gargantuan'];
+        for(i = 0, len = abilitiesName.length; i < len; ++i) {
+            if(keyword.attr[size[i]] != undefined) {
+                keyword.attr.size = size[i] + ' ' + keyword.attr[size[i]];
+                delete keyword.attr[size[i]];
+                break
             }
         }
+        
+        //Move legendary action summary to trait.
+        if(keyword.legendary["Legendary Actions"] !== undefined){
+            keyword.traits["Legendary Actions"] = keyword.legendary["Legendary Actions"];
+            delete keyword.legendary["Legendary Actions"];
+        }
+        return keyword;
+    }
+
+    function extractSection(texte, debut, fin, title)
+    {
+        section = texte.substring(debut, fin);
+        // Remove action name from action description and clean.
+        section = section.replace(new RegExp("^[\\s\\.#]*"+title.replace(/([-()\\/])/g,"\\$1")+"?[\\s\\.#]*",'i'), '');
+        section = section.replace(/#/g, ' ');
         return section;
     }
-
-    function parseAbilities(id) {
+    
+    function processSection(section)
+    {
+        // Process abilities first cause needed by other attribut.
+        if('abilities' in section.attr) parseAbilities(section.attr.abilities);
+        if('size' in section.attr) parseSize(section.attr.size);
+        if('armor class' in section.attr) parseArmorClass(section.attr['armor class']);
+        if('hit points' in section.attr) parseHp(section.attr['hit points']);
+        if('speed' in section.attr) parseSpeed(section.attr.speed);
+        if('challenge' in section.attr) parseChallenge(section.attr.challenge);
+        if('saving throws' in section.attr) parseSavingThrow(section.attr['saving throws']);
+        if('skills' in section.attr) parseSkills(section.attr.skills);
+        if('senses' in section.attr) parseSenses(section.attr.senses);
+        
+        if('damage immunities' in section.attr) setAttribut('npc_damage_immunity', section.attr['damage immunities']);
+        if('condition immunities' in section.attr) setAttribut('npc_condition_immunity', section.attr['condition immunities']);
+        if('damage vulnerabilities' in section.attr) setAttribut('npc_damage_vulnerability', section.attr['damage vulnerabilities']);
+        if('languages' in section.attr) setAttribut('npc_languages', section.attr['languages']);
+        if('damage resistances' in section.attr) setAttribut('npc_damage_resistance', section.attr['damage resistances']);
+        
+        parseTraits(section.traits);
+        parseActions(section.actions, section.legendary);
+    }
+    
+    /* Section parsing function */
+    function parseAbilities(abilities) {
         var regex = /(\d+)\s*\(/g;
         var match = [];
-        
-        while(matches = regex.exec(section['abilities'])) {
+
+        while(matches = regex.exec(abilities)) {
             match.push(matches[1]);
         }
-        
-        jf.setAttribut(id, 'npc_strength', match[0]);
-        jf.setAttribut(id, 'npc_dexterity', match[1]);
-        jf.setAttribut(id, 'npc_constitution', match[2]);
-        jf.setAttribut(id, 'npc_intelligence', match[3]);
-        jf.setAttribut(id, 'npc_wisdom', match[4]);
-        jf.setAttribut(id, 'npc_charisma', match[5]);
-    }
 
-    function parseArmorClass(id) {
-        var match = section['armor class'].match(/(\d+)\s?(.*)/);
-        jf.setAttribut(id, 'npc_AC', match[1]);
-        jf.setAttribut(id, 'npc_AC_note', match[2]);
+        setAttribut('npc_strength', match[0]);
+        setAttribut('npc_dexterity', match[1]);
+        setAttribut('npc_constitution', match[2]);
+        setAttribut('npc_intelligence', match[3]);
+        setAttribut('npc_wisdom', match[4]);
+        setAttribut('npc_charisma', match[5]);
     }
-
-    function parseSize(id) {
-        var match = section['size'].match(/(.*?) (.*?), (.*)/i);
-        jf.setAttribut(id, 'npc_size', match[1]);
-        jf.setAttribut(id, 'npc_type', match[2]);
-        jf.setAttribut(id, 'npc_alignment', match[3]);
+    function parseSize(size) {
+        var match = size.match(/(.*?) (.*?), (.*)/i);
+        setAttribut('npc_size', match[1]);
+        setAttribut('npc_type', match[2]);
+        setAttribut('npc_alignment', match[3]);
     }
-
-    function parseHp(id) {
-        var match = section['hit points'].match(/.*?(\d+)\s+\(((?:\d+)d(?:\d+))/i);
-        jf.setAttribut(id, 'npc_HP', match[1], match[1]);
-        jf.setAttribut(id, 'npc_HP_hit_dice', match[2]);
+    function parseArmorClass(ac) {
+        var match = ac.match(/(\d+)\s?(.*)/);
+        setAttribut('npc_AC', match[1]);
+        setAttribut('npc_AC_note', match[2]);
     }
-
-    function parseSpeed(id) {
+    function parseHp(hp) {
+        var match = hp.match(/.*?(\d+)\s+\(((?:\d+)d(?:\d+))/i);
+        setAttribut('npc_HP', match[1], match[1]);
+        setAttribut('npc_HP_hit_dice', match[2]);
+    }
+    function parseSpeed(speed) {
         var baseAttr = 'npc_speed';
         var regex = /(|fly|climb|swim|burrow)\s*(\d+)(?:ft\.|\s)+(\(.*\))?/gi;
-        while(match = regex.exec(section['speed'])) {
-
+        while(match = regex.exec(speed)) {
             var attrName = baseAttr + (match[1] != '' ? '_' + match[1].toLowerCase() : '');
             var value = match[2];
             if(match[3] != undefined)
                 value += ' ' + match[3];
 
-            jf.setAttribut(id, attrName, value);
+            setAttribut(attrName, value);
         }
     }
-
-    function parseChallenge(id) {
-        input = section['challenge'].replace(/[, ]/g, '');
+    function parseChallenge(cr) {
+        input = cr.replace(/[, ]/g, '');
         var match = input.match(/([\d/]+).*?(\d+)/);
-        jf.setAttribut(id, 'npc_challenge', match[1]);
-        jf.setAttribut(id, 'npc_xp', parseInt(match[2]));
+        setAttribut('npc_challenge', match[1]);
+        setAttribut('npc_xp', parseInt(match[2]));
     }
-
-    function parseSavingThrow(id) {
+    function parseSavingThrow(save) {
         var regex = /(STR|DEX|CON|INT|WIS|CHA).*?(\d+)/gi;
         var attr, value;
-        while(match = regex.exec(section['saving throws'])) {
+        while(match = regex.exec(save)) {
+            // Substract ability modifier from this field since sheet compute it
             switch(match[1].toLowerCase()) {
                 case 'str':
                     attr = 'npc_strength';
@@ -433,12 +403,12 @@
                     attr = 'npc_charisma';
                     break;
             }
-            jf.setAttribut(id, attr + '_save_bonus', match[2] - Math.floor((getAttrByName(id, attr) - 10) / 2));
+            setAttribut(attr + '_save_bonus', match[2] - Math.floor((getAttrByName(characterId, attr) - 10) / 2));
         }
     }
-
-    function parseSkills(id) {
-        var skills = {
+    function parseSkills(skills) {
+        // Need to substract ability modifier skills this field since sheet compute it
+        var skillAbility = {
             acrobatics: 'dexterity',
             "animal handling": 'wisdom',
             arcana: 'intelligence',
@@ -458,173 +428,141 @@
             stealth: 'dexterity',
             survival: 'wisdom'
         };
-
-        input = section['skills'].replace(/Skills\s+/i, '');
+        
         var regex = /([\w\s]+).*?(\d+)/gi;
-        while(match = regex.exec(input)) {
+        while(match = regex.exec(skills.replace(/Skills\s+/i, ''))) {
             var skill = match[1].trim().toLowerCase();
-            if(skill in skills) {
-                var abilitymod = skills[skill];
-                var attr = 'npc_' + skill.replace(' ', '') + '_bonus';
-                jf.setAttribut(id, attr, match[2] - Math.floor((getAttrByName(id, 'npc_' + abilitymod) - 10) / 2));
+            if(skill in skillAbility) {
+                var abilitymod = skillAbility[skill];
+                var attr = 'npc_' + skill.replace(/\s/g, '') + '_bonus';
+                log(attr);
+                setAttribut(attr, match[2] - Math.floor((getAttrByName(characterId, 'npc_' + abilitymod) - 10) / 2));
             } else {
                 errors.push("Skill " + skill + ' is not a valid skill');
             }
         }
     }
-
-    function parseTraits(id) {
-        var texte = "";
-        //var traits = splitRegex(section['traits'], /#([A-Z].*?)\./g);
-        var traits = splitRegex(section['traits'], /#([A-Z][\w-]+(?:\s[A-Z\(\d][\w-\)]+)*)\./g);
-
-        _.each(traits, function(value, key) {
-            texte += jf.capitalizeEachWord(key) + ': ' + value.replace(/\.#/g, '.\n').replace(/#/g, ' ') + '\n';
-        });
-        texte = texte.slice(0, -1);
-
-        // Add legendary action to traits
-        if('legendary actions' in section) {
-            var legendary = splitRegex(section['legendary actions'], /#([A-Z][\w-]+(?:\s[A-Z\(\d][\w-\)]+)*)\./g);
-            texte += '\n\nLegendary Actions\n' + legendary.debut.replace(/\.#/g, '.\n').replace(/#/g, ' ') + '\n';
-            delete legendary.debut;
-
-            _.each(legendary, function(value, key) {
-                if(value != '')
-                    texte += jf.capitalizeEachWord(key) + ': ' + value.replace(/#/g, ' ') + '\n';
-            });
-            texte = texte.slice(0, -1);
-        }
-
-        if(jf.whisperTraitsToGm == true)
-            texte = texte.replace(/\n/g, '\n/w GM ');
-
-        jf.setAttribut(id, 'npc_traits', texte);
+    function parseSenses(senses){
+        senses = senses.replace(/[,\s]*passive.*/i,'');
+        if(senses.length>0)
+            setAttribut('npc_senses', senses);
     }
-
-    function parseActions(id) {
-        if(section.actions.indexOf('#') !== 0)
-            section.actions = '#' + section.actions;
-
-        //var actions = splitRegex(section['actions'], /#((?:[A-Z][a-z]+[0-9-\s(\/)]{0,5})+)\./g);
-        var actions = splitRegex(section['actions'], /#([A-Z][\w-]+(?:\s[A-Z\(\d][\w-\)]+)*)\./g);
-        var cpt = 1;
-        var buffer = [];
-        var multi = "";
-
-        //MUltiattack
-        if('multiattack' in actions) {
-            multi = actions.multiattack.replace(/\.#/g, '.\n').replace(/#/g, ' ');
-            jf.setAttribut(id, 'npc_multiattack', multi);
-            delete actions.multiattack;
+    
+    function parseTraits(traits) {
+        var texte = "";
+        _.each(traits, function(value, key) {
+            value = value.replace(/[\.\s]+$/,'.')
+            texte += '**'+key+'**: ' + value + ' ';
+        });
+        
+        texte = texte.slice(0,-1);
+        setAttribut('npc_traits', texte);
+    }
+    
+    function parseActions(actions, legendary){
+        
+        var multiattackText = '';
+        var actionPosition = []; // For use with multiattack.
+        
+        if('Multiattack' in actions) {
+            setAttribut('npc_multiattack', actions.Multiattack);
+            multiattackText = actions.Multiattack
+            delete actions.Multiattack;
         }
-
-        _.each(actions, function(value, key) {
-            if(value == '') return;
-
-            var bufferKey = key;
-            if((pos = key.indexOf('(')) > 1) {
-                bufferKey = key.substring(0, pos - 1);
-            }
-            buffer[cpt] = bufferKey;
-
-            key = jf.capitalizeEachWord(key);
-            jf.setAttribut(id, 'npc_action_name' + cpt, key);
-
-            value = value.replace(/\.#/g, '.\n').replace(/#/g, '');
-
+        
+        var cpt = 1;
+        _.each(actions, function(value, key) 
+        {
+            if((pos = key.indexOf('('))>1 )
+                actionPosition[cpt] = key.substring(0, pos - 1).toLowerCase();
+            else
+                actionPosition[cpt] = key.toLowerCase();
+            
+            setAttribut('npc_action_name' + cpt, key);
+            
+            // Convert dice to inline roll and split description from effect
             var match = value.match(/(Each|Hit:)/);
             if(match != null) {
-                texte = value.substring(0, match.index).replace(/(\+(\d+))/g, '$1 : [[1d20+$2]]|[[1d20+$2]]');
-                jf.setAttribut(id, 'npc_action_description' + cpt, texte);
+                texte = value.substring(0, match.index).replace(/(\+\s?(\d+))/g, '$1 : [[1d20+$2]]|[[1d20+$2]]');
+                setAttribut('npc_action_description' + cpt, texte);
 
                 texte = value.substring(match.index).replace(/(\d+d\d+[\d\s+]*)/g, '[[$1]]')
-                jf.setAttribut(id, 'npc_action_effect' + cpt, texte);
+                setAttribut('npc_action_effect' + cpt, texte);
             } else {
-                texte = value.replace(/(\+(\d+))/g, '$1 : [[1d20+$2]]|[[1d20+$2]]');
-                jf.setAttribut(id, 'npc_action_description' + cpt, texte);
+                texte = value.replace(/(\+\s?(\d+))/g, '$1 : [[1d20+$2]]|[[1d20+$2]]');
+                setAttribut('npc_action_description' + cpt, texte);
             }
             
             // Create token action
             if(jf.usePowerAbility)
-                jf.setAbility(id, key, "", powercardAbility(id,cpt), jf.createAbilityAsToken);
+                setAbility(key, "", powercardAbility(id, cpt), jf.createAbilityAsToken);
             else
-                jf.setAbility(id, key, "", "%{selected|NPCAction"+cpt+"}", jf.createAbilityAsToken);
-
+                setAbility(key, "", "%{selected|NPCAction" + cpt + "}", jf.createAbilityAsToken);
+ 
             cpt++;
         });
-
-        if(multi != '') {
-            var tmp = buffer.join('|').slice(1);
-            var regex = new RegExp("(?:(?:(one|two) with its )?(" + tmp + "))", "gi");
+        
+        var actionList = actionPosition.join('|').slice(1);
+        
+        if(multiattackText != ''){
+            //var regex = new RegExp("(?:(?:(one|two) with its )?(" + actionList + "))", "gi");
+            var regex = new RegExp("(one|two)? (?:with its )?(" + actionList + ")", "gi");
             var macro = "";
             
-            while(match = regex.exec(multi)) {
+            while(match = regex.exec(multiattackText)) {
                 var action = match[2];
                 var nb = match[1] || 'one';
-                var actionNumber = buffer.indexOf(action.toLowerCase());
+                var actionNumber = actionPosition.indexOf(action.toLowerCase());
                 
                 if(actionNumber !== -1) {
-                    var txt = "%{selected|NPCAction" + actionNumber + "}\n";
-                    if(nb == 'one')
-                        macro += txt;
-                    else
-                        macro += txt + txt;
-                    delete buffer[actionNumber]; // Remove 
+                    macro += "%{selected|NPCAction" + actionNumber + "}\n";
+                    if(nb == 'two')
+                        macro += "%{selected|NPCAction" + actionNumber + "}\n";
+                    delete actionPosition[actionNumber]; // Remove 
                 }
             }
             
-            jf.setAttribut(id, 'npc_action_name' + cpt, 'MultiAttack');
-            jf.setAttribut(id, 'npc_action_effect' + cpt, macro);
-            jf.setAttribut(id, 'npc_action_multiattack' + cpt, "{{npc_showmultiattack=1}} {{npc_multiattack=@{npc_multiattack}}}");
+            setAttribut('npc_action_name' + cpt, 'MultiAttack');
+            setAttribut('npc_action_effect' + cpt, macro.slice(0,-1));
+            setAttribut('npc_action_multiattack' + cpt, "{{npc_showmultiattack=1}} {{npc_multiattack=@{npc_multiattack}}}");
 
             if(jf.usePowerAbility)
-                jf.setAbility(id, 'MultiAttack', "", powercardAbility(id, cpt), jf.createAbilityAsToken);
+                setAbility('MultiAttack', "", powercardAbility(id, cpt), jf.createAbilityAsToken);
             else
-                jf.setAbility(id, 'MultiAttack', "", "%{selected|NPCAction" + cpt + "}", jf.createAbilityAsToken);
+                setAbility('MultiAttack', "", "%{selected|NPCAction" + cpt + "}", jf.createAbilityAsToken);    
+            cpt++;
         }
-    }
-
-    function powercardAbility(id, npcActionNumber) {
-        //From Skilf
-        var action_name = jf.getAttribut(id, "npc_action_name" + npcActionNumber);
-        var action_desc = jf.getAttribut(id, "npc_action_description" + npcActionNumber);
-        var action_effect = jf.getAttribut(id, "npc_action_effect" + npcActionNumber);
-        var action_multi = jf.getAttribut(id, "npc_action_multiattack" + npcActionNumber);
-        var action_type = jf.getAttribut(id, "npc_action_type" + npcActionNumber);
-
-        if(action_type !== false) {
-            action_type = action_type.substring(action_type.indexOf("(") + 1, action_type.lastIndexOf(")")).trim().toLowerCase();
-            if(action_type.indexOf(" ") != -1) {
-                action_type = action_type.substring(0, action_type.lastIndexOf(" ")).trim();
+        
+        _.each(legendary, function(value, key) {
+            setAttribut('npc_action_name' + cpt, key);
+            setAttribut('npc_action_type' + cpt, '(Legendary Action)');
+            
+            var regex = new RegExp("makes a (" + actionList + ")", "i");
+            var match = value.match(regex);
+            if(match != null){
+                var macro = "%{selected|NPCAction" + actionPosition.indexOf(match[1].toLowerCase()) + "}";
+                setAttribut('npc_action_effect' + cpt, macro);
             }
-        } else {
-            action_type = "normal";
-        }
-        if(action_multi !== false) {
-            multi_str = " --Multiattack|Yes ";
-        } else {
-            multi_str = "";
-        }
-
-        var attack_type = action_desc.substring(0, action_desc.indexOf(":"));
-        var attack_bonus = action_desc.substring(action_desc.indexOf(":") + 1, action_desc.lastIndexOf(":")).trim();
-        var attack_desc = action_desc.substring(action_desc.indexOf(","));
-        var attack_string = "[[d20" + attack_bonus + "]]|[[d20" + attack_bonus + "]]";
-
-        var hit_value = action_effect.substring(action_effect.indexOf("(") + 1, action_effect.indexOf(")")).trim();
-        var hit_desc = action_effect.substring(action_effect.indexOf(")") + 1);
-
-        var powertext = "!power --charid|" + id + " --emote|" + section.title + " uses " + action_name + "  --format|" + action_type + " --name|" + action_name + "  --leftsub|" + action_type + " --rightsub|" + attack_type + multi_str + " --Attack|" + attack_string + " " + attack_desc + " --Hit|" + hit_value + " " + hit_desc;
-        if(jf.whisperTraitsToGm == true) {
-            powertext = powertext + " --whisper|GM";
-        }
-        return powertext;
+            else {
+                var match = value.match(/(Each|Hit:)/);
+                if(match != null) {
+                    texte = value.substring(0, match.index).replace(/(\+\s?(\d+))/g, '$1 : [[1d20+$2]]|[[1d20+$2]]');
+                    setAttribut('npc_action_description' + cpt, texte);
+    
+                    texte = value.substring(match.index).replace(/(\d+d\d+[\d\s+]*)/g, '[[$1]]')
+                    setAttribut('npc_action_effect' + cpt, texte);
+                } else {
+                    texte = value.replace(/(\+\s?(\d+))/g, '$1 : [[1d20+$2]]|[[1d20+$2]]');
+                    setAttribut('npc_action_description' + cpt, texte);
+                }
+            }
+            cpt++;
+        });
     }
-
+    
 }(typeof jf === 'undefined' ? jf = {} : jf));
 
 on("ready", function() {
     'use strict';
     jf.statblock.RegisterHandlers();
-});
+});  
