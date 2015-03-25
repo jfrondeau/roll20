@@ -1,3 +1,4 @@
+
 (function(jf, undefined) {
 
     jf.createAbilityAsToken = true;
@@ -12,7 +13,7 @@
     jf.parsebar3 = 'npc_HP'; //npc_speed'; 
 
     jf.statblock = {
-        version: "2.1",
+        version: "2.2",
         RegisterHandlers: function() {
             on('chat:message', HandleInput);
 
@@ -99,10 +100,13 @@
             if(token.get(bar + '_link') != "")
                 throw('Token ' + bar + ' is linked');
 
-            rollCharacterHp(represent, function(total) {
+            rollCharacterHp(represent, function(total, original) {
                 token.set(bar + '_value', total);
                 token.set(bar + '_max', total);
-                sendChat('GM', 'Hp rolled: ' + total);
+                var message = '/w GM Hp rolled: ' + total;
+                if(original > 0)
+                    message += ' ajusted from original result of ' + original;
+                sendChat('GM', message);
             });
         } catch(e) {
             log('Exception: ' + e);
@@ -122,6 +126,7 @@
         var nb_dice = parseInt(match[1], 10);
         var nb_face = parseInt(match[2], 10)
         var total = 0;
+        var original = 0;
 
         sendChat("GM", "/roll " + hd, function(ops) {
             var rollResult = JSON.parse(ops[0].content);
@@ -136,10 +141,11 @@
                     // Calculate average HP, has written in statblock.
                     var average_hp = Math.floor(((nb_face + 1) / 2 + npc_constitution_mod) * nb_dice);
                     if(average_hp > total) {
+                        original = total;
                         total = average_hp;
                     }
                 }
-                callback(total);
+                callback(total, original);
             }
         });
     }
