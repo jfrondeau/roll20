@@ -1,15 +1,17 @@
 (function(jf, undefined) {
 
+    /* Options */
     jf.createAbilityAsToken = true;
     jf.monsterAsMinHp = true; // generated token hp can't be lower than the average hp
     jf.rollMonsterHpOnDrop = true; // will roll HP when character are dropped on map
 
+    // Setting those too a sheet value will set the token bar value.
     // Green bar
-    jf.parsebar1 = 'npc_passive_perception'; //'npc_HP';
+    jf.parsebar1 = 'npc_HP';
     // Blue bar
     jf.parsebar2 = 'npc_AC'; 
     // Red bar
-    jf.parsebar3 = 'npc_HP'; //npc_speed'; 
+    jf.parsebar3 = 'npc_speed'; //'npc_passive_perception' 
 
     jf.statblock = {
         version: "2.3",
