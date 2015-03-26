@@ -45,8 +45,6 @@
             case '!jf-rollhp':
                 return jf.rollHpForSelectedToken(msg);
                 break;
-            case '!jf-test':
-                return jf.test();
         }
     }
 
@@ -719,30 +717,6 @@
         } else {
             log("Can't set empty value to bar " + barNumber);
         }
-    }
-    
-    function processInlinerolls(msg) {
-        if (_.has(msg, 'inlinerolls')) {
-            return _.chain(msg.inlinerolls)
-                    .reduce(function(previous, current, index) {
-                        previous['$[[' + index + ']]'] = current.results.total || 0;
-                        return previous;
-                    },{})
-                    .reduce(function(previous, current, index) {
-                        return previous.replace(index, current);
-                    }, msg.content)
-                    .value();
-        } else {
-            return msg.content;
-        }
-    }
-
-    jf.test = function() {
-        var val = "[[10 + @{Spy|npc_passive_perception}]]";
-        //var val = "[[10 + 1d20]]";
-        sendChat('', val, function(ops) {
-            log(ops);
-        })
     }
 
 }(typeof jf === 'undefined' ? jf = {} : jf));
