@@ -1,4 +1,3 @@
-
 (function(jf, undefined) {
 
     jf.createAbilityAsToken = true;
@@ -13,7 +12,7 @@
     jf.parsebar3 = 'npc_HP'; //npc_speed'; 
 
     jf.statblock = {
-        version: "2.2",
+        version: "2.3",
         RegisterHandlers: function() {
             on('chat:message', HandleInput);
 
@@ -38,7 +37,6 @@
         }
 
         args = msg.content.split(/\s+/);
-
         switch(args[0]) {
             case '!build-monster':
             case '!jf-parse':
@@ -47,6 +45,8 @@
             case '!jf-rollhp':
                 return jf.rollHpForSelectedToken(msg);
                 break;
+            case '!jf-test':
+                return jf.test();
         }
     }
 
@@ -69,6 +69,7 @@
                 }
             }
         } catch(e) {
+            log(e);
             log('Exception: ' + e);
             sendChat('GM', '/w GM ' + e);
         }
@@ -80,9 +81,8 @@
 
     jf.rollTokenHp = function(token) {
         var number = 0;
-        for(i = 1; i < 4; i++){
-            if(jf['parsebar'+ i] == 'npc_HP')
-            {
+        for(i = 1; i < 4; i++) {
+            if(jf['parsebar' + i] == 'npc_HP') {
                 number = i;
                 break;
             }
@@ -90,7 +90,7 @@
         if(number == 0) {
             throw('One of the jf.parsebar option has to be set to "npc_HP" for random HP roll');
         }
-        
+
         var bar = 'bar' + number;
         var represent = '';
         try {
@@ -207,10 +207,12 @@
             var name = jf.parseStatblock(statblock);
             if(characterId != null) {
                 token.set("represents", characterId);
-                
+                token.set("name", name);
+
                 processBarSetting(1, token, name);
                 processBarSetting(2, token, name);
                 processBarSetting(3, token, name);
+
             }
         } catch(e) {
             status = "Parsing was incomplete due to error(s)";
@@ -219,11 +221,11 @@
         }
 
         log(status);
-        sendChat('GM', '/w GM ' + status);
+        sendChat('JF', '/w GM ' + status);
 
         if(errors.length > 0) {
             log(errors.join('\n'));
-            sendChat('GM', '/w GM Error(s):\n/w GM ' + errors.join('\n/w GM '));
+            sendChat('JF', '/w GM Error(s):\n/w GM ' + errors.join('\n/w GM '));
         }
     }
 
@@ -690,45 +692,57 @@
             cpt++;
         });
     }
-    
-    function processBarSetting(i, token, name)
-    { 
-        var attribut =  jf['parsebar'+ i];
-        if(attribut != '' && attribut != undefined){
-            value = getAttrByName(characterId, attribut, 'current');
-            if(value=='') {
-                log("Character don't have '"+ attribut+ "' to set has bar" + i);
-            }
-            else if(isNaN(value))
-            {
-                var formula = value.replace(/@{/g, '@{' + name +'|');
-                sendChat("GM", "/roll " + formula, function(ops) {
-                    var rollResult = JSON.parse(ops[0].content);
-                    if(_.has(rollResult, 'total')) {
-                        setBarValue(token, i, rollResult.total);
-                    }
-                    else {
-                        log('Unable to parse ' + attribut + ' formula');
-                    }
-                });
-            }
-            else {
-                setBarValue(token, i, value);
-            }
+
+    function processBarSetting(i, token, name) {
+        var attribut = jf['parsebar' + i];
+        
+        log("Attribut to set to bar " + i + ": " + attribut);
+        
+        if(attribut != '' && attribut != undefined) {
+            //value = getAttrByName(characterId, attribut, 'current');
+            var command = "\\w GM [[@{" + name + "|"+ attribut + "}]]";
+            sendChat("JF", command, function(ops) {
+                var res = ops[0].inlinerolls["1"].results.total;
+                log(res);
+                setBarValue(token, i, res);
+                //log(res);
+            });
         }
     }
 
-    
-    function setBarValue(token, barNumber, value){
-        if(value != undefined && value != ''){
+    function setBarValue(token, barNumber, value) {
+        if(value != undefined && value != '') {
             var bar = 'bar' + barNumber;
-           // log("Setting " + bar + " to value " + value);
+            log("Setting " + bar + " to value " + value);
             token.set(bar + '_value', value);
-            token.set(bar + '_max', value);   
-        }
-        else {
+            token.set(bar + '_max', value);
+        } else {
             log("Can't set empty value to bar " + barNumber);
         }
+    }
+    
+    function processInlinerolls(msg) {
+        if (_.has(msg, 'inlinerolls')) {
+            return _.chain(msg.inlinerolls)
+                    .reduce(function(previous, current, index) {
+                        previous['$[[' + index + ']]'] = current.results.total || 0;
+                        return previous;
+                    },{})
+                    .reduce(function(previous, current, index) {
+                        return previous.replace(index, current);
+                    }, msg.content)
+                    .value();
+        } else {
+            return msg.content;
+        }
+    }
+
+    jf.test = function() {
+        var val = "[[10 + @{Spy|npc_passive_perception}]]";
+        //var val = "[[10 + 1d20]]";
+        sendChat('', val, function(ops) {
+            log(ops);
+        })
     }
 
 }(typeof jf === 'undefined' ? jf = {} : jf));
