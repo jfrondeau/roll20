@@ -8,13 +8,18 @@
     // Setting those too a sheet value will set the token bar value.
     // Green bar
     jf.parsebar1 = 'npc_HP';
+    jf.parsebar1Max = true;
     // Blue bar
     jf.parsebar2 = 'npc_AC'; 
+    jf.parsebar2Max = false;
     // Red bar
     jf.parsebar3 = 'npc_speed'; //'npc_passive_perception' 
+    jf.parsebar3Max = false;
+    
+    
 
     jf.statblock = {
-        version: "2.3",
+        version: "2.4",
         RegisterHandlers: function() {
             on('chat:message', HandleInput);
 
@@ -46,6 +51,9 @@
                 break;
             case '!jf-rollhp':
                 return jf.rollHpForSelectedToken(msg);
+                break;
+            case '!jf-clone':
+                return jf.cloneToken(msg, args[1]); 
                 break;
         }
     }
@@ -306,7 +314,7 @@
         texte = clean(statblock);
         var keyword = findKeyword(texte);
         var section = splitStatblock(texte, keyword);
-        jf.setCharacter(section.attr.name, '', section.bio);
+        jf.setCharacter(section.attr.name, texte.replace(/#/g, '<br>'), section.bio);
         processSection(section);
         return section.attr.name;
     }
@@ -703,9 +711,7 @@
             var command = "\\w GM [[@{" + name + "|"+ attribut + "}]]";
             sendChat("JF", command, function(ops) {
                 var res = ops[0].inlinerolls["1"].results.total;
-                log(res);
                 setBarValue(token, i, res);
-                //log(res);
             });
         }
     }
@@ -715,11 +721,58 @@
             var bar = 'bar' + barNumber;
             log("Setting " + bar + " to value " + value);
             token.set(bar + '_value', value);
-            token.set(bar + '_max', value);
+            if(jf['parse' + bar + 'Max'] == true)
+                token.set(bar + '_max', value);
         } else {
             log("Can't set empty value to bar " + barNumber);
         }
     }
+    
+    jf.cloneToken = function (msg, number) {
+        
+        number = parseInt(number, 10) || 1;
+        
+        jf.getSelectedToken(msg, function(token){
+            var match = token.get('imgsrc').match(/images\/.*\/(thumb|max)/i);
+            if(match == null)
+                throw("The token imgsrc do not come from you library. Unable to clone");
+                
+            var imgsrc = token.get('imgsrc').replace('/max.', '/thumb.');
+            var name = token.get("name") + " ";
+            log('Cloning ' + number + ' ' + name);
+            
+            token.set({"name": name + randomInteger(99), showname: true});
+            
+            for(var i = 0; i < number; i++){
+                
+                var left = (parseInt(token.get("left")) + (70 * (i+1)));
+                var obj = createObj("graphic", {
+                    name: name + randomInteger(99),
+                    controlledby: token.get("controlledby"),
+                    left: left,
+                    top: token.get("top"),
+                    width: token.get("width"),
+                    height: token.get("height"),
+                    showname: true,
+                    imgsrc: imgsrc,
+                    pageid: token.get("pageid"),
+                    represents: token.get('represents'),
+                    //showplayers_name: true,
+                    //showplayers_bar1: true,
+                    bar1_value: token.get("bar1_value"),
+                    bar1_max: token.get("bar1_max"),
+                    bar2_value: token.get("bar2_value"),
+                    bar2_max: token.get("bar2_max"),
+                    bar3_value: token.get("bar3_value"),
+                    bar3_max: token.get("bar3_max"),
+                    layer: "objects"
+                });
+                if(jf.rollMonsterHpOnDrop == true)
+                    jf.rollTokenHp(obj);
+            }
+        }, 1);
+    }
+
 
 }(typeof jf === 'undefined' ? jf = {} : jf));
 
