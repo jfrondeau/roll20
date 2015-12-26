@@ -710,7 +710,7 @@
             //value = getAttrByName(characterId, attribut, 'current');
             var command = "\\w GM [[@{" + name + "|"+ attribut + "}]]";
             sendChat("JF", command, function(ops) {
-                var res = ops[0].inlinerolls["1"].results.total;
+                var res = ops[0].inlinerolls[0].results.total;
                 setBarValue(token, i, res);
             });
         }
