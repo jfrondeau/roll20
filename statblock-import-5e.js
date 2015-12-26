@@ -502,7 +502,7 @@
 
     function parseSpeed(speed) {
         var baseAttr = 'npc_speed';
-        var regex = /(|fly|climb|swim|burrow)\s*(\d+)(?:ft\.|\s)+(\(.*\))?/gi;
+        var regex = /(|fly|climb|swim|burrow)\s*(\d+)(?:ft\.?|\s?)+(\(.*\))?/gi;
         while(match = regex.exec(speed)) {
             var attrName = baseAttr + (match[1] != '' ? '_' + match[1].toLowerCase() : '');
             var value = match[2];
